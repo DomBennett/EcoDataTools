@@ -1,4 +1,4 @@
 EcoDataTools
 ============
 
-Collection of tools in R for manipulating ecological data.
+Collection of tools for manipulating ecological data in R.
