@@ -1,6 +1,6 @@
 # R development files
 .Rhistory
-*._testing.R
+*_testing.R
 *~
 .Rproj.user
 *.Rproj
