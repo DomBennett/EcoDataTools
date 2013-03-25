@@ -42,3 +42,9 @@ deg2dec <- function(data, warnings = T){
   decimals <- data.frame(Latitude = decimalX, Longitude = decimalY)
   return(decimals)
 }
+
+
+
+
+
+##HI DOM
