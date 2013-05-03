@@ -1,11 +1,11 @@
-# No copyright
+# No copyright, no warranty
 # Author: Dominic John Bennett
-# Contains a series of functions for data manipulation of ecological data in R
-# (So far only one function)
-
+# 03/05/2013
+# Library of functions created for my Masters project (MRes Biodiversity Informatics
+#  and Genomics , Imperial College London) of an ecological and phylogenetic slant
 
 DegToDec <- function(data) {
-  # Takes 'coordinate strings' in degrees (D M (S)) and converts to decimals.
+  # Take 'coordinate strings' in degrees (D M (S)) and convert to decimals.
   # Expects coordinate string such: ##'##'##'
   #   - where: # denotes any number of any length, ' denotes any non-numeric(s).
   # Function will stop if more than 3 numbers in coordinate string
@@ -81,4 +81,75 @@ DegToDec <- function(data) {
   # generate output
   decimals <- data.frame(Latitude = decimal.x, Longitude = decimal.y)
   return(decimals)
+}
+
+plotComm <- function(comm.data, phylo, groups){
+  # Plot community data on community phylogeny to visualise
+  #  differences in community structure. Use colours to distinguish
+  #  site groups and alpha to distinguish abundances (like rainbow())
+  #
+  # Args:
+  #   comm.data: community data matrix (cols taxa, rows sites)
+  #   phylo: community phylogeny
+  #   groups: site groups
+  #
+  # Returns:
+  #   a matrix of community data
+  
+  # plot phylogeny, allow space for points
+  variable.max <- (nrow(comm.data) * 10) + 150
+  variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
+  plot(phylo, no.margin = T, show.tip.label = F, x.lim = c(0, variable.max))
+  
+  # generate alphas based on abundances
+  n <- length(unique(groups))
+  hs <- seq.int(0, 1 + max(1, n - 1)/n, length.out = n)%%1
+  alphas <- comm.data/max(comm.data)
+  
+  # loop init
+  ntips <- length(phylo$tip.label)
+  spacing <- 10
+  group <- groups[1]
+  j <- 1
+  
+  # loop through sites and plot points for present species
+  for(i in 1:nrow(comm.data)){
+    j <- ifelse(group == groups[i], j, j + 1)
+    pull <- as.logical(comm.data[i,])
+    taxa <- phylo$tip.label[pull]
+    abunds <- alphas[i, pull]
+    tiplabels(tip = match(taxa, phylo$tip.label),
+              pch = 19, adj = spacing, col = hsv(rep(hs[j], ntips), 1, 1, abunds))
+    spacing <- spacing + 10
+    group <- groups[i]
+  }
+}
+
+randCommData <- function(phylo, nsites, nspp, pa = TRUE, lam = 0.1){
+  # Generates random community data for testing community phylogenetic
+  #  methods
+  #
+  # Args:
+  #   phylo: phylogeny
+  #   nsites: number of sites
+  #   nspp: number of species for each site
+  #   pa: presence/absence data?
+  #   lam: lambda for poisson distribution if pa is False
+  #
+  # Returns:
+  #   a matrix of community data
+  ntips <- length(phylo$tip.label)
+  output <- matrix(rep(NA, ntips * nsites),
+                   ncol = ntips, nrow = nsites)
+  colnames(output) <- phylo$tip.label
+  if (pa) {
+    for (i in 1:nsites) {
+      output[i, ] <- sample(c(rep(1, nspp), rep(0, ntips - nspp)))
+    }
+  } else {
+    for (i in 1:nsites) {
+      output[i, ] <- sample(rpois(ntips, lam))
+    }
+  }
+  return(output)
 }
