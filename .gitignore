@@ -5,3 +5,6 @@
 .Rproj.user
 *.Rproj
 *.RData
+
+# Folders
+figure/
