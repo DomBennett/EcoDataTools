@@ -1,6 +1,6 @@
 ## No copyright, no warranty
 ## Dominic John Bennett
-## 25/05/2013
+## 26/05/2013
 ## Library of functions created for my Masters project (MRes Biodiversity Informatics
 ##  and Genomics , Imperial College London) of an ecological and phylogenetic slant
 
@@ -92,7 +92,86 @@ library(picante)
 library(caper)
 library(lme4)
 
-## Function
+## Functions
+uniquePD <- function(phylo, taxa, display = FALSE, show.tip.label = TRUE){
+  # Calculate unique length of branches unique to taxa given
+  #
+  # Args:
+  #  phylo: phylogeny
+  #  taxa: vector of taxon names for which to calcualte PD#
+  #  display: if TRUE, plot phylogeny colouring branches which count towards
+  #   PD, default FALSE
+  #  show.tip.label: if TRUE, plot tip labels, default FALSE
+  #
+  # Return:
+  #  numeric
+  if(length(taxa) == length(phylo$tip.label)){
+    if(display == TRUE){
+      plot.phylo(phylo, show.tip.label = show.tip.label)
+    }
+    return(sum(phylo$edge.length))
+  }
+  edges <- match(match(taxa, phylo$tip.label), phylo$edge[,2])
+  end.nodes <- phylo$edge[edges, 1]
+  while(any(duplicated(end.nodes))){
+    start.node <- end.nodes[duplicated(end.nodes)][1]
+    if(sum(phylo$edge[,1] %in% start.node) == sum(end.nodes %in% start.node)){
+      edge <- match(start.node, phylo$edge[,2])
+      end.node <- phylo$edge[edge,1]
+      edges <- c(edges, edge)
+      end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
+    }else{
+      end.nodes <- end.nodes[end.nodes != start.node]
+    }
+  }
+  if(display){
+    tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
+    edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
+    plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
+               show.tip.label = show.tip.label)
+  }
+  return(sum(phylo$edge.length[edges]))
+}
+
+calcPD <- function(phylo, taxa, display = FALSE,
+                   show.tip.label = FALSE) {
+  # Calculate Faith's Phylogenetic Diversity and plot phylogeny
+  #
+  # Args:
+  #  phylo: phylogeny
+  #  taxa: vector of taxon names for which to calcualte PD#
+  #  display: if TRUE, plot phylogeny colouring branches which count towards
+  #   PD, default FALSE
+  #  show.tip.label: if TRUE, plot tip labels, default FALSE
+  #
+  # Return:
+  #  numeric
+  if(length(taxa) == length(phylo$tip.label)){
+    if(display == TRUE){
+      plot.phylo(phylo, show.tip.label = show.tip.label)
+    }
+    return(sum(phylo$edge.length))
+  }
+  edges <- match(match(taxa, phylo$tip.label), phylo$edge[,2])
+  end.nodes <- phylo$edge[edges, 1]
+  while(sum(end.nodes[1] == end.nodes) != length(end.nodes)){
+    end.nodes <- sort(end.nodes, TRUE)
+    start.node <- end.nodes[1]
+    edge <- match(start.node, phylo$edge[,2])
+    end.node <- phylo$edge[edge,1]
+    edges <- c(edges, edge)
+    end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
+  }
+  if(display){
+    tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
+    edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
+    plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
+               show.tip.label = show.tip.label)
+  }
+  return(sum(phylo$edge.length[edges]))
+}
+
+
 plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data))){
   # Plot community data on community phylogeny to visualise
   #  differences in community structure. Use colours to distinguish
@@ -105,9 +184,8 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data))){
   #
   # Return:
   #  a matrix of community data
-  
   # plot phylogeny, allow space for points
-  variable.max <- (nrow(comm.data) * 10) #+ 150
+  variable.max <- (nrow(comm.data) * 10) + 150
   #variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
   plot(phylo, no.margin = T, show.tip.label = F, x.lim = c(0, variable.max))
   
