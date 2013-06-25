@@ -1,5 +1,5 @@
 ## No copyright, no warranty
-## Dominic John Bennett
+## Dominic John Bennett & Jun Ying Lim
 ## Last update: 25/06/2013
 ## Functions for PD analysis BIG project 2013
 
@@ -8,7 +8,7 @@ library(picante)
 library(caper)
 library(lme4)
 
-## Functions
+## Dom's Functions:
 PD <- function(phylo, taxa, type = 1, prop = FALSE,
                display = FALSE, show.tip.label = FALSE) {
   # Calculate Faith's Phylogenetic Diversity and plot phylogeny
@@ -284,3 +284,6 @@ phyloRare <- function(comm.data, phylo, metric = 'PD', nrands = 1000,
   }
   return(list(phylo = out.phylo, se = out.se))
 }
+
+## Jun's Functions
+# PUT YOUR FUNCTIONS HERE JUN!
