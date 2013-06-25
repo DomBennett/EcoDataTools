@@ -1,91 +1,7 @@
 ## No copyright, no warranty
 ## Dominic John Bennett
-## 26/05/2013
-## Library of functions created for my Masters project (MRes Biodiversity Informatics
-##  and Genomics , Imperial College London) of an ecological and phylogenetic slant
-
-## Coordinate manipulation
-
-DegToDec <- function(data) {
-  # Take 'coordinate strings' in degrees (D M (S)) and convert to decimals.
-  # Expects coordinate string such: ##'##'##'
-  #   - where: # denotes any number of any length, ' denotes any non-numeric(s).
-  # Function will stop if more than 3 numbers in coordinate string
-  #
-  # Args:
-  #   data: a matrix or dataframe of coordinates (Latitude and Longitude).
-  #
-  # Returns:
-  #   A dataframe of converted coordinates.
-  
-  # input checking
-  if(!is.data.frame(data) & !is.matrix(data)) {
-    stop("Input must be a matrix or dataframe, such:\n
-         Latitude     Longitude\n
-         51°28\'46.92\"  0°0\'29.47\"")
-  }
-  if(ncol(data)!= 2) {
-    stop("Input must have two columns, such:\n
-         Latitude     Longitude\n
-         51°28\'46.92\"  0°0\'29.47\"")
-  }
-  two.numbers <- apply(data, 1:2, function(x) grepl("([^0-9][0-9]|[0-9][^0-9])", x))
-  if(!all(two.numbers)) {
-    print("Invalid data entries:")
-    print(data[!two.numbers])
-    stop("Input must be coordinate character strings with at least 2 numbers, e.g.:\n
-         Latitude     Longitude\n
-         51°28\'46.92\"  0°0\'29.47\"")
-  }
-  
-  # vector inputs
-  x <- data[ ,1] #latitude is x
-  y <- data[ ,2] #longitude is y
-  
-  # find start and end of numbers in coordinate strings
-  index.x1 <- gregexpr("[0-9\\-\\.]+", x)
-  index.x2 <- gregexpr("([0-9][^0-9]|[0-9]$)", x)
-  index.y1 <- gregexpr("[0-9\\-\\.]+", y)
-  index.y2 <- gregexpr("([0-9][^0-9]|[0-9]$)", y)
-  
-  # vector outputs
-  decimal.x <- rep(NA, nrow(data))
-  decimal.y <- rep(NA, nrow(data))
-  
-  # loop through each row of coordinate string:
-  #   - take the first number in string, add the second number/60
-  #     and then the third/3600
-  #    - stop if more than 3 numbers found.
-  error.message1 <- "\nMore than 3 numbers in:\n data["
-  error.message2 <- "\nTry checking for non-numeric characters in numbers e.g.:\n
-  Here, there is an extra space between the 9 and 2 -- 51°28\'46.9 2\""
-  for(i in 1:nrow(data)) {
-    decimal.x[i] <- as.numeric(substr(x[i], index.x1[[i]][1], index.x2[[i]][1]))
-    for(j in 2:length(index.x1[[i]])) {
-      if(j > 3){stop(paste0(error.message1, 1, ",", i,"] -- ",x[i],error.message2))}
-      division <- ifelse(j == 2, 60, 3600)
-      next.x <- as.numeric(substr(x[i], index.x1[[i]][j], index.x2[[i]][j]))
-      decimal.x[i] <- decimal.x[i] + (next.x/division)
-    }
-    decimal.y[i] <- as.numeric(substr(y[i], index.y1[[i]][1], index.y2[[i]][1]))
-    for(j in 2:length(index.y1[[i]])) {
-      if(j > 3){stop(paste0(error.message1, 2, ",", i,"] -- ",y[i],error.message2))}
-      division <- ifelse(j == 2, 60, 3600)
-      next.y <- as.numeric(substr(y[i], index.y1[[i]][j], index.y2[[i]][j]))
-      decimal.y[i] <- decimal.y[i] + (next.y/division)
-    }
-  }
-  
-  # control for S and W
-  decimal.x <- decimal.x * ifelse(grepl("(S|s)", x), -1, 1)
-  decimal.y <- decimal.y * ifelse(grepl("(W|w)", y), -1, 1)
-  
-  # generate output
-  decimals <- data.frame(Latitude = decimal.x, Longitude = decimal.y)
-  return(decimals)
-}
-
-## Phylogenetic Community Analysis
+## Last update: 25/06/2013
+## Functions for PD analysis BIG project 2013
 
 ## Libraries
 library(picante)
@@ -93,35 +9,80 @@ library(caper)
 library(lme4)
 
 ## Functions
-uniquePD <- function(phylo, taxa, display = FALSE, show.tip.label = TRUE){
-  # Calculate unique length of branches unique to taxa given
+PD <- function(phylo, taxa, type = 1, prop = FALSE,
+               display = FALSE, show.tip.label = FALSE) {
+  # Calculate Faith's Phylogenetic Diversity and plot phylogeny
   #
   # Args:
-  #  phylo: phylogeny
-  #  taxa: vector of taxon names for which to calcualte PD#
+  #  phylo: phylogeny (ape class)
+  #  taxa: vector of taxon names for which to calcualte PD
+  #  type: specify the way in which PD is calcualted
+  #     1 -- sum of branch lengths of phylogeny consisting solely of the taxa,
+  #       default
+  #     2 -- sum of branch lengths of taxa to terminal node
+  #     3 -- sum of branch lengths represented uniquely by the taxa
+  #  prop: if TRUE, return the proportion of the branch not the absolute
+  #   value, default FALSE
   #  display: if TRUE, plot phylogeny colouring branches which count towards
   #   PD, default FALSE
   #  show.tip.label: if TRUE, plot tip labels, default FALSE
   #
   # Return:
   #  numeric
+  if(!type %in% c(1,2,3)) {
+    stop("Type must be an integer: 1, 2 or 3.")
+  }
   if(length(taxa) == length(phylo$tip.label)){
     if(display == TRUE){
       plot.phylo(phylo, show.tip.label = show.tip.label)
     }
-    return(sum(phylo$edge.length))
+    if (prop) {
+      return(1)
+    } else {
+      return(sum(phylo$edge.length))
+    }
   }
+  if(type == 1 & length(taxa) == 1){
+    stop("length(taxa) == 1 :
+         Cannot calculate PD for a single taxon for type 1.")
+  }
+  # start at the tips and step back into the phylogeny ...
+  # ...add all connecting edges to a vector...
+  # stop when all paths have met at the same node (type = 1)
+  # or when all paths have reached the root node (type = 2)
+  # or when all the nodes are unique (type = 3)
   edges <- match(match(taxa, phylo$tip.label), phylo$edge[,2])
   end.nodes <- phylo$edge[edges, 1]
-  while(any(duplicated(end.nodes))){
-    start.node <- end.nodes[duplicated(end.nodes)][1]
-    if(sum(phylo$edge[,1] %in% start.node) == sum(end.nodes %in% start.node)){
+  term.node <- length(phylo$tip.label) + 1
+  if (type == 3){
+    while(any(duplicated(end.nodes))){
+      start.node <- end.nodes[duplicated(end.nodes)][1]
+      if(sum(phylo$edge[,1] %in% start.node) == sum(end.nodes %in% start.node)){
+        edge <- match(start.node, phylo$edge[,2])
+        end.node <- phylo$edge[edge,1]
+        edges <- c(edges, edge)
+        end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
+      }else{
+        end.nodes <- end.nodes[end.nodes != start.node]
+      }
+    }
+  } else {
+    while(TRUE){
+      end.nodes <- sort(end.nodes, TRUE)
+      start.node <- end.nodes[1]
       edge <- match(start.node, phylo$edge[,2])
       end.node <- phylo$edge[edge,1]
       edges <- c(edges, edge)
       end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-    }else{
-      end.nodes <- end.nodes[end.nodes != start.node]
+      if(type == 2){
+        if(sum(end.nodes[1] == term.node) == length(end.nodes)){
+          break
+        }
+      } else {
+        if(sum(end.nodes[1] == end.nodes) == length(end.nodes)){
+          break
+        }
+      }
     }
   }
   if(display){
@@ -130,49 +91,16 @@ uniquePD <- function(phylo, taxa, display = FALSE, show.tip.label = TRUE){
     plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
                show.tip.label = show.tip.label)
   }
-  return(sum(phylo$edge.length[edges]))
-}
-
-calcPD <- function(phylo, taxa, display = FALSE,
-                   show.tip.label = FALSE) {
-  # Calculate Faith's Phylogenetic Diversity and plot phylogeny
-  #
-  # Args:
-  #  phylo: phylogeny
-  #  taxa: vector of taxon names for which to calcualte PD#
-  #  display: if TRUE, plot phylogeny colouring branches which count towards
-  #   PD, default FALSE
-  #  show.tip.label: if TRUE, plot tip labels, default FALSE
-  #
-  # Return:
-  #  numeric
-  if(length(taxa) == length(phylo$tip.label)){
-    if(display == TRUE){
-      plot.phylo(phylo, show.tip.label = show.tip.label)
-    }
-    return(sum(phylo$edge.length))
+  if (prop) {
+    return(sum(phylo$edge.length[edges]) / sum(phylo$edge.length))
+  } else {
+    return(sum(phylo$edge.length[edges]))
   }
-  edges <- match(match(taxa, phylo$tip.label), phylo$edge[,2])
-  end.nodes <- phylo$edge[edges, 1]
-  while(sum(end.nodes[1] == end.nodes) != length(end.nodes)){
-    end.nodes <- sort(end.nodes, TRUE)
-    start.node <- end.nodes[1]
-    edge <- match(start.node, phylo$edge[,2])
-    end.node <- phylo$edge[edge,1]
-    edges <- c(edges, edge)
-    end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-  }
-  if(display){
-    tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
-    edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
-    plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
-               show.tip.label = show.tip.label)
-  }
-  return(sum(phylo$edge.length[edges]))
 }
 
 
-plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data))){
+plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
+                     no.margin = TRUE){
   # Plot community data on community phylogeny to visualise
   #  differences in community structure. Use colours to distinguish
   #  site groups and alpha to distinguish abundances (works like rainbow())
@@ -187,7 +115,8 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data))){
   # plot phylogeny, allow space for points
   variable.max <- (nrow(comm.data) * 10) + 150
   #variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
-  plot(phylo, no.margin = T, show.tip.label = F, x.lim = c(0, variable.max))
+  plot(phylo, no.margin = no.margin, show.tip.label = FALSE,
+       x.lim = c(0, variable.max))
   
   # generate alphas based on abundances
   n <- length(unique(groups))
@@ -331,4 +260,27 @@ evenCommData <- function(phylo, nsites, nspp) {
     }
   }
   return(output)
+}
+
+phyloRare <- function(comm.data, phylo, metric = 'PD', nrands = 1000,
+                        proportion = FALSE) {
+  mat <- as.matrix(comm.data)
+  out.phylo <- rep(NA, nrow(mat))
+  out.se <- out.phylo
+  raremax <- min(rowSums(mat))
+  for (i in 1:nrow(mat)) {
+    site.taxa <- colnames(mat)[mat[i,] > 0]
+    phylo.rand <- rep(NA, nrands)
+    for (j in 1:nrands) {
+      taxa <- sample(site.taxa, raremax)
+      if(metric == 'PD') {
+        phylo.rand[j] <- PD(phylo, taxa, proportion = proportion)
+      } else {
+        stop('Unknown phylo metric.')
+      }
+    }
+    out.phylo[i] <- mean(phylo.rand)
+    out.se[i] <- sd(phylo.rand)/sqrt(length(phylo.rand))
+  }
+  return(list(phylo = out.phylo, se = out.se))
 }
