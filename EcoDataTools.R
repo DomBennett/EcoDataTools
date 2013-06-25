@@ -96,7 +96,7 @@ PD <- function(phylo, taxa, type = 1, prop = FALSE,
   } else {
     return(sum(phylo$edge.length[edges]))
   }
-}
+  }
 
 
 plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
@@ -113,7 +113,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   # Return:
   #  a matrix of community data
   # plot phylogeny, allow space for points
-  variable.max <- (nrow(comm.data) * 10) + 150
+  variable.max <- 5 + (nrow(comm.data)/4)
   #variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
   plot(phylo, no.margin = no.margin, show.tip.label = FALSE,
        x.lim = c(0, variable.max))
@@ -125,7 +125,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   
   # loop init
   ntips <- length(phylo$tip.label)
-  spacing <- 10
+  spacing <- 0.75
   group <- groups[1]
   j <- 1
   
@@ -137,7 +137,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
     abunds <- alphas[i, pull]
     tiplabels(tip = match(taxa, phylo$tip.label),
               pch = 19, adj = spacing, col = hsv(rep(hs[j], ntips), 1, 1, abunds))
-    spacing <- spacing + 10
+    spacing <- spacing + 0.25
     group <- groups[i]
   }
 }
@@ -263,7 +263,7 @@ evenCommData <- function(phylo, nsites, nspp) {
 }
 
 phyloRare <- function(comm.data, phylo, metric = 'PD', nrands = 1000,
-                        proportion = FALSE) {
+                      proportion = FALSE) {
   mat <- as.matrix(comm.data)
   out.phylo <- rep(NA, nrow(mat))
   out.se <- out.phylo
