@@ -9,4 +9,4 @@ For descriptions and examples of use check out our [wiki](https://github.com/Dom
 
 Authors
 -------------------------
-D.J. Bennett & J.Y. Lim
+[D. J. Bennett](https://github.com/DomBennett) & [J. Lim](https://github.com/junyinglim)
