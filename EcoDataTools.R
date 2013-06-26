@@ -24,6 +24,7 @@ extractEdges <- function(phylo, taxa, type = 1) {
   #
   # Return:
   #  vector of edges
+  # TODO: Must revise this to make it more efficient (26/06/2013)
   if (!type %in% c(1,2,3)) {
     stop("Type must be an integer: 1, 2 or 3.")
   }
@@ -63,7 +64,7 @@ extractEdges <- function(phylo, taxa, type = 1) {
       edges <- c(edges, edge)
       end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
       if (type == 2){
-        if (sum (end.nodes[1] == term.node) == length (end.nodes)){
+        if (sum (term.node == end.nodes) == length (end.nodes)){
           break
         }
       } else {
@@ -74,6 +75,47 @@ extractEdges <- function(phylo, taxa, type = 1) {
     }
   }
   return (edges)
+  }
+
+commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
+                   taxon.names = colnames(comm.data)) {
+  # Calculate Faith's PD for a community given a community phylogeny and a community
+  #  matrix. Depends on extractEdges().
+  #
+  # Args:
+  #  phylo: community phylogeny (ape class)
+  #  comm.data: matrix of community data, species as cols sites as rows
+  #  type: which branches to include for calculating PD, either 1, 2 or 3,
+  #   default 2 -- see extractEdges()
+  #  min.spp: minimum number of species to include for calculating PD, default 2
+  #  taxon.names: if taxon.names are not the column names of comm.data specify
+  #   here, else ignore.
+  #
+  # Return:
+  # vector of PDs
+  if (type == 1 & min.spp < 2) {
+    stop("Cannot compute type 2 PD for fewer than 2 species")
+  }
+  calcPD <- function (row) {
+    taxa <- taxon.names[as.logical(row)]
+    edges <- extractEdges(phylo, taxa, type)
+    return (sum(phylo$edge.length[edges]))
+  }
+  # add site names if none
+  if (is.null(rownames(comm.data))) {
+    rownames(comm.data) <- 1:nrow(comm.data)
+  }
+  # convert to incidence
+  presences <- comm.data[comm.data > 0]
+  comm.data[comm.data > 0] <- rep(1, length(presences))
+  # drop sites with too few species
+  row.sums <- rowSums(comm.data) > min.spp
+  site.names <- rownames(comm.data)[row.sums]
+  comm.data <- comm.data[row.sums, ]
+  # calculate PD by site
+  pds <- as.matrix(apply(comm.data, 1, calcPD))
+  rownames(pds) <- site.names
+  return (pds)
 }
 
 plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
