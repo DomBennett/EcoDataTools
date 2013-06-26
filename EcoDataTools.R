@@ -281,27 +281,96 @@ evenCommData <- function(phylo, nsites, nspp) {
   return(output)
 }
 
-phyloRare <- function(comm.data, phylo, metric = 'PD', nrands = 1000,
-                      proportion = FALSE) {
-  mat <- as.matrix(comm.data)
-  out.phylo <- rep(NA, nrow(mat))
-  out.se <- out.phylo
-  raremax <- min(rowSums(mat))
-  for (i in 1:nrow(mat)) {
-    site.taxa <- colnames(mat)[mat[i,] > 0]
-    phylo.rand <- rep(NA, nrands)
-    for (j in 1:nrands) {
-      taxa <- sample(site.taxa, raremax)
-      if(metric == 'PD') {
-        phylo.rand[j] <- PD(phylo, taxa, proportion = proportion)
-      } else {
-        stop('Unknown phylo metric.')
-      }
-    }
-    out.phylo[i] <- mean(phylo.rand)
-    out.se[i] <- sd(phylo.rand)/sqrt(length(phylo.rand))
+phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
+                        type = 1) {
+  # Monte-Carlo method for rarefiying community data using common phylogenetic
+  #  metrics. Depends on picante.
+  #
+  # Args:
+  #  comm.data: community matrix, species as cols and sites as rows
+  #  phylo: phylogeny (ape class)
+  #  samp: sample size (minimum incidence of abundance)
+  #  metric: either PD, PSV, PSE, PSR, PSC or PSD
+  #  nrands: the number of iterations
+  #  types: if PD, type of PD to calculate
+  #
+  # Returns:
+  #  matrix of rarefied PD by site and standard error
+  # TODO(27/06/2013): unit test this and add test to wiki
+  if (any(rowSums(comm.data) < samp)) {
+    stop("Some sites have incidence/abundance less than samp")
   }
-  return(list(phylo = out.phylo, se = out.se))
+  # is it incidence data or abundance?
+  if (any(comm.data > 1)) {
+    abun <- TRUE
+  } else {
+    abun <- FALSE
+  }
+  # define internal functions for rapid vectorization
+  # a lot of function definitions but avoids if statements for speed!!
+  pluck <- function(row) {
+    # this takes a community matrix and randomly distributes the occurences
+    # of species using samp works for both incidence and abundance
+    samples <- table(sample(1:length(row), samp, prob = row, replace = abun))
+    sampled.row <- rep(0, length(row))
+    sampled.row[as.numeric(names(samples))] <- samples
+    return (sampled.row)
+  } 
+  PDrarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(commPD(phylo, plucked, type, samp)))
+  }
+  PSVrarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(psv(plucked, phylo)[ ,1]))
+  }
+  PSErarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(pse(plucked, phylo)[ ,1]))
+  }
+  PSRrarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(psr(plucked, phylo)[ ,1]))
+  }
+  PSCrarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(psc(plucked, phylo)[ ,1]))
+  }
+  PSDrarefy <- function(x) {
+    plucked <- t(apply(mat, 1, pluck))
+    colnames(plucked) <- colnames(mat)
+    return(as.vector(psd(plucked, phylo)[ ,1]))
+  }
+  calcSE <- function (x) {
+    return (sd(x)/sqrt(length(x)))
+  }
+  # now for the actual calculations ...
+  mat <- as.matrix(comm.data)
+  if (metric == 'PD') {
+    mat.phylo <- sapply(1:nrands, PDrarefy)
+  } else if (metric == 'PSV') {
+    mat.phylo <- sapply(1:nrands, PSVrarefy)
+  } else if (metric == 'PSE') {
+    mat.phylo <- sapply(1:nrands, PSErarefy)
+  } else if (metric == 'PSR') {
+    mat.phylo <- sapply(1:nrands, PSRrarefy)
+  } else if (metric == 'PSC') {
+    mat.phylo <- sapply(1:nrands, PSCrarefy)
+  } else if (metric == 'PSD') {
+    mat.phylo <- sapply(1:nrands, PSDrarefy)
+  } else {
+    stop('Unknown metric. Use: PD, PSV, PSE, PSR, PSC or PSD')
+  }
+  out.phylo <- apply(mat.phylo, 1, mean)
+  out.se <- apply(mat.phylo, 1, calcSE)
+  out <- cbind(out.phylo, out.se)
+  colnames(out) <- c(metric, paste0(metric, '.se'))
+  return(out)
 }
 
 ## Jun's Functions
@@ -414,5 +483,3 @@ taxa2phylomatic <- function(taxa, output.dir, binom){
   #Argument for phylomatic tree to use
   #Argument to supply user trees
 }
-
-
