@@ -11,95 +11,70 @@ library(stringr) #String manipulation tools
 library(RCurl) ##GET and POST to URL queries functionality
 
 ## Dom's Functions:
-PD <- function(phylo, taxa, type = 1, prop = FALSE,
-               display = FALSE, show.tip.label = FALSE) {
-  # Calculate Faith's Phylogenetic Diversity and plot phylogeny
+extractEdges <- function(phylo, taxa, type = 1) {
+  # Extract edges from a phylo object using 1 of 3 methods
   #
   # Args:
   #  phylo: phylogeny (ape class)
-  #  taxa: vector of taxon names for which to calcualte PD
-  #  type: specify the way in which PD is calcualted
-  #     1 -- sum of branch lengths of phylogeny consisting solely of the taxa,
-  #       default
-  #     2 -- sum of branch lengths of taxa to terminal node
-  #     3 -- sum of branch lengths represented uniquely by the taxa
-  #  prop: if TRUE, return the proportion of the branch not the absolute
-  #   value, default FALSE
-  #  display: if TRUE, plot phylogeny colouring branches which count towards
-  #   PD, default FALSE
-  #  show.tip.label: if TRUE, plot tip labels, default FALSE
+  #  taxa: vector of taxon names
+  #  type:
+  #     1 -- phylogeny consisting solely of the taxa, default
+  #     2 -- edges from taxon tips to terminal node
+  #     3 -- edges unique to taxa
   #
   # Return:
-  #  numeric
-  if(!type %in% c(1,2,3)) {
+  #  vector of edges
+  if (!type %in% c(1,2,3)) {
     stop("Type must be an integer: 1, 2 or 3.")
   }
-  if(length(taxa) == length(phylo$tip.label)){
-    if(display == TRUE){
-      plot.phylo(phylo, show.tip.label = show.tip.label)
-    }
-    if (prop) {
-      return(1)
-    } else {
-      return(sum(phylo$edge.length))
-    }
+  if (length(taxa) == length (phylo$tip.label)){
+    return(phylo$edge)
   }
-  if(type == 1 & length(taxa) == 1){
+  if (type == 1 & length (taxa) == 1){
     stop("length(taxa) == 1 :
-         Cannot calculate PD for a single taxon for type 1.")
+         Cannot return a single edge for type 1.")
   }
   # start at the tips and step back into the phylogeny ...
   # ...add all connecting edges to a vector...
   # stop when all paths have met at the same node (type = 1)
   # or when all paths have reached the root node (type = 2)
   # or when all the nodes are unique (type = 3)
-  edges <- match(match(taxa, phylo$tip.label), phylo$edge[,2])
+  edges <- match (match (taxa, phylo$tip.label), phylo$edge[,2])
   end.nodes <- phylo$edge[edges, 1]
-  term.node <- length(phylo$tip.label) + 1
+  term.node <- length (phylo$tip.label) + 1
   if (type == 3){
-    while(any(duplicated(end.nodes))){
+    while (any (duplicated (end.nodes))){
       start.node <- end.nodes[duplicated(end.nodes)][1]
-      if(sum(phylo$edge[,1] %in% start.node) == sum(end.nodes %in% start.node)){
-        edge <- match(start.node, phylo$edge[,2])
+      if (sum (phylo$edge[,1] %in% start.node) == sum (end.nodes %in% start.node)){
+        edge <- match (start.node, phylo$edge[,2])
         end.node <- phylo$edge[edge,1]
         edges <- c(edges, edge)
         end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      }else{
+      } else {
         end.nodes <- end.nodes[end.nodes != start.node]
       }
     }
   } else {
-    while(TRUE){
-      end.nodes <- sort(end.nodes, TRUE)
+    while (TRUE){
+      end.nodes <- sort (end.nodes, TRUE)
       start.node <- end.nodes[1]
-      edge <- match(start.node, phylo$edge[,2])
+      edge <- match (start.node, phylo$edge[,2])
       end.node <- phylo$edge[edge,1]
       edges <- c(edges, edge)
       end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      if(type == 2){
-        if(sum(end.nodes[1] == term.node) == length(end.nodes)){
+      if (type == 2){
+        if (sum (end.nodes[1] == term.node) == length (end.nodes)){
           break
         }
       } else {
-        if(sum(end.nodes[1] == end.nodes) == length(end.nodes)){
+        if (sum (end.nodes[1] == end.nodes) == length (end.nodes)){
           break
         }
       }
     }
   }
-  if(display){
-    tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
-    edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
-    plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
-               show.tip.label = show.tip.label)
-  }
-  if (prop) {
-    return(sum(phylo$edge.length[edges]) / sum(phylo$edge.length))
-  } else {
-    return(sum(phylo$edge.length[edges]))
-  }
-  }
-
+  return (edges)
+}
 
 plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
                      no.margin = TRUE){

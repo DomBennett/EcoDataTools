@@ -1,28 +1,37 @@
 ## Dominic Bennett
-## 25/06/2013
+## 26/06/2013
 ## Generate test data and images for wiki
 
 ## Dirs
 source('EcoDataTools.R')
 
 ## Calculating Faith's PD
+plotEdges <- function (phylo, edges) {
+  tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
+  edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
+  plot.phylo(phylo, edge.lty = edge.lties, tip.color = tip.cols,
+             show.tip.label = TRUE)
+}
 phylo <- read.tree(file.path("wiki","Phylocom_phylo.tre"))
 phylo <- drop.tip(phylo, phylo$tip.label[1:12])
 taxa <- phylo$tip.label[c(20,16:13,5:6)]
 png(filename = file.path("wiki", "PD.png"), width = 1000, height = 800)
 split.screen(c(2,2))
 screen(1)
-pd <- PD(phylo, taxa, type = 1, prop = FALSE, display = TRUE)
+edges <- extractEdges(phylo, taxa, type = 1)
+plotEdges(phylo, edges)
 mtext("Type 1: phylogeny of the taxa", line = 2)
-mtext(paste("PD:", pd, "   min: 2"))
+mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 2"))
 screen(2)
-pd <- PD(phylo, taxa, type = 2, prop = FALSE, display = TRUE)
+edges <- extractEdges(phylo, taxa, type = 2)
+plotEdges(phylo, edges)
 mtext("Type 2: branches from the taxa tips to the terminal node", line = 2)
-mtext(paste("PD:", pd, "   min: 1"))
+mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 1"))
 screen(3)
-pd <- PD(phylo, taxa, type = 3, prop = FALSE, display = TRUE)
+edges <- extractEdges(phylo, taxa, type = 3)
+plotEdges(phylo, edges)
 mtext("Type 3: branches uniquely represented by the taxa", line = 2)
-mtext(paste("PD:", pd, "   min: 1"))
+mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 1"))
 close.screen(all.screens = TRUE)
 dev.off()
 
