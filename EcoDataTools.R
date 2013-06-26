@@ -1,5 +1,5 @@
 ## No copyright, no warranty
-## Dominic John Bennett & Jun Ying Lim
+## Dominic John Bennett & Junying Lim
 ## Last update: 25/06/2013
 ## Functions for PD analysis BIG project 2013
 
@@ -7,6 +7,8 @@
 library(picante)
 library(caper)
 library(lme4)
+library(stringr) #String manipulation tools
+library(RCurl) ##GET and POST to URL queries functionality
 
 ## Dom's Functions:
 PD <- function(phylo, taxa, type = 1, prop = FALSE,
@@ -343,4 +345,57 @@ phylotraitdist <- function(native, alien, phy, trait){
 	return(cbind(pnndresults, traitresults))
 }
 
-# PUT YOUR FUNCTIONS HERE JUN!
+taxa2phylomatic <- function(taxa, output.dir, binom){
+  storedtree= "R20120829"
+  informat = outformat = "newick"
+  method = "phylomatic"
+  url = 'http://phylodiversity.net/phylomatic/pmws'
+  taxaformat = "slashpath"
+  constraint.dir = file.path(output.dir, "constraint.nwk")
+  unmatched.dir = file.path(output.dir, "unmatched.txt")
+  # Phylomatic does not accept line breaks
+  taxa <- str_replace_all(taxa, " ", "_")
+  binom <- str_replace_all(binom, " ", "_")
+  taxa <- paste(taxa, collapse = "\n")
+  taxastring <- str_replace_all(str_replace_all(taxa, "/", "%2F"), "\n", "%0D")
+  # Writing phylomatic query string
+  phylomat.dat1 = paste("storedtree=", storedtree, "&", "informat=", informat, "&", "method=", method, "&", sep = "") 
+  phylomat.dat2 = paste("taxaformat=", taxaformat, "&", "clean=true", "&", "outformat=", outformat, "&", sep = "")
+  phylomat.dat3 = paste("taxa=", taxastring, sep = "")
+  fullstr <- paste(phylomat.dat1, phylomat.dat2, phylomat.dat3, sep = "")
+  # Parsing string to phylomatic using Curl
+  print("Generating constraint tree using phylomatic...")
+  temp <- postForm(uri = url, curl = getCurlHandle(), .opts = list(postfields = fullstr))
+  # Cleaning up names (because tip labels may change in capitalization)
+  for(i in 1:length(binom)){
+    print(binom[i])
+    temp <- gsub(pattern = binom[i], x = temp, replacement = binom[i], ignore.case = TRUE)
+  }
+  # Removing unmatched taxa
+  matched <- gsub("\\[.+\\]", "", temp)
+  # Export newick file
+  print(paste("Writing constraint tree to ", constraint.dir))
+  constraintnwk <-file(constraint.dir)
+  writeLines(matched, constraintnwk)
+  close(constraintnwk)
+  # Exporting unmatched taxa to separte document
+  m <- regexpr("\\[.+\\]", temp)
+  unmatched <- regmatches(temp, m)
+  print(unmatched)
+  print(paste("Writing unmatched taxa to ", unmatched.dir))
+  unmatchedfile <- file(unmatched.dir)
+  writeLines(unmatched, unmatchedfile)
+  close(unmatchedfile)
+  #Defunct code. Does not handle large Request-URIs
+  #urlquery <- paste(url, "?", phylomat.dat1, phylomat.dat2, phylomat.dat3, sep = "")
+  #tt <- getURLContent(urlquery, curl = getCurlHandle())
+  #phylomatic_nwk <- tt[[1]]
+  #return(phylomatic_nwk)
+  
+  ## TO DO##
+  #Stem-name option for output file name
+  #Argument for phylomatic tree to use
+  #Argument to supply user trees
+}
+
+
