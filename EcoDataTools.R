@@ -4,7 +4,7 @@
 ## Functions for PD analysis BIG project 2013
 
 ## Libraries
-library(picante)
+library(picante) # Phylogenetic analytical tools
 library(caper)
 library(lme4)
 library(stringr) #String manipulation tools
@@ -431,14 +431,14 @@ phylotraitdist <- function(native, alien, phy, trait){
 	return(cbind(pnndresults, traitresults))
 }
 
-taxa2phylomatic <- function(taxa, output.dir, binom){
+taxa2phylomatic <- function(taxa, output.dir, output.name, binom, storedtree){
   storedtree= "R20120829"
   informat = outformat = "newick"
   method = "phylomatic"
   url = 'http://phylodiversity.net/phylomatic/pmws'
   taxaformat = "slashpath"
-  constraint.dir = file.path(output.dir, "constraint.nwk")
-  unmatched.dir = file.path(output.dir, "unmatched.txt")
+  constraint.dir = file.path(output.dir, paste(output.name, "_tree.nwk", sep =""))
+  unmatched.dir = file.path(output.dir, paste(output.name, "_unmatched.txt", sep = ""))
   # Phylomatic does not accept line breaks
   taxa <- str_replace_all(taxa, " ", "_")
   binom <- str_replace_all(binom, " ", "_")
@@ -479,7 +479,6 @@ taxa2phylomatic <- function(taxa, output.dir, binom){
   #return(phylomatic_nwk)
   
   ## TO DO##
-  #Stem-name option for output file name
   #Argument for phylomatic tree to use
   #Argument to supply user trees
 }
