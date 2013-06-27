@@ -1,11 +1,12 @@
 ## Dominic Bennett
-## 26/06/2013
+## 27/06/2013
 ## Generate test data and images for wiki
 
 ## Dirs
 source('EcoDataTools.R')
 
-## Calculating Faith's PD
+## extractEdges()
+# showing the different types
 plotEdges <- function (phylo, edges) {
   tip.cols <- ifelse(phylo$tip.label %in% taxa, "black", "grey")
   edge.lties <- ifelse(1:nrow(phylo$edge) %in% edges, 1, 3)
@@ -21,18 +22,32 @@ screen(1)
 edges <- extractEdges(phylo, taxa, type = 1)
 plotEdges(phylo, edges)
 mtext("Type 1: phylogeny of the taxa", line = 2)
-mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 2"))
+mtext(paste("PD:", sum(phylo$edge.length[edges]), "   min: 2"))
 screen(2)
 edges <- extractEdges(phylo, taxa, type = 2)
 plotEdges(phylo, edges)
 mtext("Type 2: branches from the taxa tips to the terminal node", line = 2)
-mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 1"))
+mtext(paste("PD:", sum(phylo$edge.length[edges]), "   min: 1"))
 screen(3)
 edges <- extractEdges(phylo, taxa, type = 3)
 plotEdges(phylo, edges)
 mtext("Type 3: branches uniquely represented by the taxa", line = 2)
-mtext(paste("PD:", sum(phylo$edge.lengths[edges]), "   min: 1"))
+mtext(paste("PD:", sum(phylo$edge.length[edges]), "   min: 1"))
 close.screen(all.screens = TRUE)
+dev.off()
+# example usage
+phylo <- read.tree(file.path("wiki","Phylocom_phylo.tre"))
+taxa1 <- sample(phylo$tip.label, 16, prob = 1:length(phylo$tip.label))
+taxa2 <- phylo$tip.label[!phylo$tip.label %in% taxa1]
+edges1 <- extractEdges(phylo, taxa1, type = 3)
+edges2 <- extractEdges(phylo, taxa2, type = 3)
+tip.cols <- ifelse(phylo$tip.label %in% taxa1, "darkgreen", "darkred")
+edges.cols <- rep("darkblue", nrow(phylo$edge))
+edges.cols[1:nrow(phylo$edge) %in% edges1] <- rep("darkgreen", length(edges1))
+edges.cols[1:nrow(phylo$edge) %in% edges2] <- rep("darkred", length(edges2))
+png(filename = file.path("wiki", "PD_signal.png"), width = 1000, height = 800)
+plot.phylo(phylo, edge.color = edges.cols, tip.color = tip.cols,
+           show.tip.label = TRUE)
 dev.off()
 
 ## Community plot images
