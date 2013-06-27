@@ -290,9 +290,9 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
   #  comm.data: community matrix, species as cols and sites as rows
   #  phylo: phylogeny (ape class)
   #  samp: sample size (minimum incidence of abundance)
-  #  metric: either PD, PSV, PSE, PSR, PSC or PSD
-  #  nrands: the number of iterations
-  #  types: if PD, type of PD to calculate
+  #  metric: either PD, PSV, PSE, PSR, PSC or PSD, default PD
+  #  nrands: the number of iterations, default 2000
+  #  types: if PD, type of PD to calculate, default 1
   #
   # Returns:
   #  matrix of rarefied PD by site and standard error
