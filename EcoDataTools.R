@@ -24,9 +24,11 @@ extractEdges <- function(phylo, taxa, type = 1) {
   #
   # Return:
   #  vector of edges
-  # TODO: Must revise this to make it more efficient (26/06/2013)
   if (!type %in% c(1,2,3)) {
     stop("Type must be an integer: 1, 2 or 3.")
+  }
+  if (!is.vector(taxa) | !is.character(taxa)) {
+    stop("Invalid or no taxa given.")
   }
   if (length(taxa) == length (phylo$tip.label)){
     return(phylo$edge)
@@ -43,39 +45,43 @@ extractEdges <- function(phylo, taxa, type = 1) {
   edges <- match (match (taxa, phylo$tip.label), phylo$edge[,2])
   end.nodes <- phylo$edge[edges, 1]
   term.node <- length (phylo$tip.label) + 1
-  if (type == 3){
-    while (any (duplicated (end.nodes))){
-      start.node <- end.nodes[duplicated(end.nodes)][1]
-      if (sum (phylo$edge[,1] %in% start.node) == sum (end.nodes %in% start.node)){
+  if (all(end.nodes %in% term.node)) {
+    return(edges)
+  } else {
+    if (type == 3){
+      while (any (duplicated (end.nodes))){
+        start.node <- end.nodes[duplicated(end.nodes)][1]
+        if (sum (phylo$edge[,1] %in% start.node) == sum (end.nodes %in% start.node)){
+          edge <- match (start.node, phylo$edge[,2])
+          end.node <- phylo$edge[edge,1]
+          edges <- c(edges, edge)
+          end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
+        } else {
+          end.nodes <- end.nodes[end.nodes != start.node]
+        }
+      }
+    } else {
+      while (TRUE){
+        end.nodes <- sort (end.nodes, TRUE)
+        start.node <- end.nodes[1]
         edge <- match (start.node, phylo$edge[,2])
         end.node <- phylo$edge[edge,1]
         edges <- c(edges, edge)
         end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      } else {
-        end.nodes <- end.nodes[end.nodes != start.node]
-      }
-    }
-  } else {
-    while (TRUE){
-      end.nodes <- sort (end.nodes, TRUE)
-      start.node <- end.nodes[1]
-      edge <- match (start.node, phylo$edge[,2])
-      end.node <- phylo$edge[edge,1]
-      edges <- c(edges, edge)
-      end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      if (type == 2){
-        if (sum (term.node == end.nodes) == length (end.nodes)){
-          break
-        }
-      } else {
-        if (sum (end.nodes[1] == end.nodes) == length (end.nodes)){
-          break
+        if (type == 2){
+          if (sum (term.node == end.nodes) == length (end.nodes)){
+            break
+          }
+        } else {
+          if (sum (end.nodes[1] == end.nodes) == length (end.nodes)){
+            break
+          }
         }
       }
     }
+    return (edges)
   }
-  return (edges)
-  }
+}
 
 commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
                    taxon.names = colnames(comm.data)) {
@@ -132,8 +138,21 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   # Return:
   #  a matrix of community data
   # plot phylogeny, allow space for points
-  variable.max <- 5 + (nrow(comm.data)/4)
-  #variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
+  edges <- extractEdges(phylo, phylo$tip.label[1], type = 2)
+  phylo$edge.length <- phylo$edge.length/sum(phylo$edge.length[edges])
+  # make all phylos the same length before plotting i.e. all branches from terminal
+  # node to tip equal 1
+  # for some weird reason the rules of plotting are dyanmic!
+  if (nrow(comm.data) < 20) {
+    variable.max <- 1 + nrow(comm.data)/20
+    spacing.start <- 0.55
+    spacing.i <- 0.05
+  } else {
+    variable.max <- nrow(comm.data)/10
+    spacing.i <- 0.1 - 1/nrow(comm.data)
+    # some stupid f***ing bizarre eqn! Why is it not linear!?!?!?!
+    spacing.start <- 0.5 + spacing.i
+  }
   plot(phylo, no.margin = no.margin, show.tip.label = FALSE,
        x.lim = c(0, variable.max))
   
@@ -144,7 +163,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   
   # loop init
   ntips <- length(phylo$tip.label)
-  spacing <- 0.75
+  spacing <- spacing.start
   group <- groups[1]
   j <- 1
   
@@ -156,38 +175,9 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
     abunds <- alphas[i, pull]
     tiplabels(tip = match(taxa, phylo$tip.label),
               pch = 19, adj = spacing, col = hsv(rep(hs[j], ntips), 1, 1, abunds))
-    spacing <- spacing + 0.25
+    spacing <- spacing + spacing.i
     group <- groups[i]
   }
-}
-
-randCommData <- function(phylo, nsites, nspp, pa = TRUE, lam = 0.1){
-  # Generate random community data for testing community phylogenetic
-  #  methods
-  #
-  # Args:
-  #   phylo: phylogeny
-  #   nsites: number of sites
-  #   nspp: number of species for each site
-  #   pa: presence/absence data?
-  #   lam: lambda for poisson distribution if pa is False
-  #
-  # Return:
-  #   a matrix of community data
-  ntips <- length(phylo$tip.label)
-  output <- matrix(rep(NA, ntips * nsites),
-                   ncol = ntips, nrow = nsites)
-  colnames(output) <- phylo$tip.label
-  if (pa) {
-    for (i in 1:nsites) {
-      output[i, ] <- sample(c(rep(1, nspp), rep(0, ntips - nspp)))
-    }
-  } else {
-    for (i in 1:nsites) {
-      output[i, ] <- sample(rpois(ntips, lam))
-    }
-  }
-  return(output)
 }
 
 split0 <- function(r = c(1, 10) , n = 2) {
