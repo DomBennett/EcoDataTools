@@ -180,6 +180,35 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   }
 }
 
+randCommData <- function(phylo, nsites, nspp, pa = TRUE, lam = 0.1){
+  # Generate random community data for testing community phylogenetic
+  #  methods
+  #
+  # Args:
+  #   phylo: phylogeny
+  #   nsites: number of sites
+  #   nspp: number of species for each site
+  #   pa: presence/absence data?
+  #   lam: lambda for poisson distribution if pa is False
+  #
+  # Return:
+  #   a matrix of community data
+  ntips <- length(phylo$tip.label)
+  output <- matrix(rep(NA, ntips * nsites),
+                   ncol = ntips, nrow = nsites)
+  colnames(output) <- phylo$tip.label
+  if (pa) {
+    for (i in 1:nsites) {
+      output[i, ] <- sample(c(rep(1, nspp), rep(0, ntips - nspp)))
+    }
+  } else {
+    for (i in 1:nsites) {
+      output[i, ] <- sample(rpois(ntips, lam))
+    }
+  }
+  return(output)
+}
+
 split0 <- function(r = c(1, 10) , n = 2) {
   # evenly split a range into n
   #
@@ -197,22 +226,24 @@ split0 <- function(r = c(1, 10) , n = 2) {
   return(round((output * (max(r) - min(r))) + min(r)))
 }
 
-genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
+genCommData <- function(phylo, focal, fact = 1, mean.incid, mean.abun = FALSE,
+                        nsites = 1) {
   # Generate clustered/overdispersed data for testing community
-  #  phylogenetic analyses.
+  #  phylogenetic analyses. Return either incidence or abundance data.
   #
   # Args:
   #  phylo - phylo.object, on which the community data will be based
   #  focal - numeric index, indicating which tip to perform cluster/dispersion
-  #  nsites - the number of sites to create
-  #  nspp - the number of species to occur at each site
-  #  clust - if TRUE, data will be clustered else overdispersed
   #  fact - scaling coefficient: larger the number the more pronounced the
   #   effect by a power law (hence 0 not allowed)
+  #  mean.incid - the mean incidence of species in the community
+  #  mean.abun - the mean abundance per site, if given output will be abundances
+  #  nsites - number of sites
   #
   # Return:
   #  a matrix of community data
   invertVector <- function(dists) {
+    # for reversing the probs for overdispersion
     u <- sort(unique(dists), TRUE)
     s <- sort(u)
     probs <- rep(NA, length(dists))
@@ -220,6 +251,21 @@ genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
       probs[u[i] == dists] <- s[i]
     }
     return (probs)
+  }
+  genAbuns <- function(row) {
+    # for generating abundances for each row
+    out.row <- rep(0, ntips)
+    temp.probs <- probs
+    temp.probs[row < 1] <- 0
+    abundance <- abs(ceiling(rnorm(1, mean = mean.abun)))
+    if (abundance == 0) {
+      return (out.row)
+    } else {
+      abuns <- sample(1:ntips, abundance, prob = temp.probs, replace = TRUE)
+      abuns <- table(abuns)
+      out.row[as.numeric(names(abuns))] <- abuns
+      return (out.row)
+    }
   }
   ntips <- length(phylo$tip.label)
   output <- matrix(rep(NA, ntips * nsites),
@@ -231,8 +277,14 @@ genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
   probs <- focal.dists^abs(fact)
   probs <- probs/sum(probs)
   for (i in 1:nsites) {
-    output[i, ] <- ifelse(1:ntips %in% sample(1:ntips, nspp,
+    incidence <- abs(ceiling(rnorm(1, mean = mean.incid))) # avoid negative numbers
+    output[i, ] <- ifelse(1:ntips %in% sample(1:ntips, incidence,
                                               prob = probs), 1, 0)
+  }
+  if (mean.abun != FALSE) {
+    for (i in 1:nsites) {
+      output[i, ] <- genAbuns(output[i, ])
+    }
   }
   return (output)
 }
