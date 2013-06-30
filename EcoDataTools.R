@@ -326,19 +326,24 @@ evenCommData <- function(phylo, nsites, nspp) {
 phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
                         type = 1) {
   # Monte-Carlo method for rarefiying community data using common phylogenetic
-  #  metrics. Depends on picante.
+  #  metrics
   #
   # Args:
   #  comm.data: community matrix, species as cols and sites as rows
   #  phylo: phylogeny (ape class)
   #  samp: sample size (minimum incidence of abundance)
-  #  metric: either PD, PSV, PSE, PSR, PSC or PSD, default PD
-  #  nrands: the number of iterations, default 2000
-  #  types: if PD, type of PD to calculate, default 1
+  #  metric: either PD, PSV, PSE, PSR, PSC or PSD
+  #  nrands: the number of iterations
+  #  types: if PD, type of PD to calculate
   #
   # Returns:
   #  matrix of rarefied PD by site and standard error
-  # TODO(27/06/2013): unit test this and add test to wiki
+  if (ncol(comm.data) != length(phylo$tip.label)) {
+    stop("Community data and phylogeny are different sizes.")
+  } 
+  if (!any(phylo$tip.label %in% colnames(comm.data))) {
+    stop("Phylogeny tip names and community data names do not match.")
+  }
   if (any(rowSums(comm.data) < samp)) {
     stop("Some sites have incidence/abundance less than samp")
   }
@@ -389,7 +394,7 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
     return(as.vector(psd(plucked, phylo)[ ,1]))
   }
   calcSE <- function (x) {
-    return (sd(x)/sqrt(length(x)))
+    return (sd(x, na.rm = TRUE)/sqrt(length(x)))
   }
   # now for the actual calculations ...
   mat <- as.matrix(comm.data)
@@ -408,8 +413,9 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
   } else {
     stop('Unknown metric. Use: PD, PSV, PSE, PSR, PSC or PSD')
   }
-  out.phylo <- apply(mat.phylo, 1, mean)
+  out.phylo <- apply(mat.phylo, 1, mean, na.rm = TRUE)
   out.se <- apply(mat.phylo, 1, calcSE)
+  # certain metrics can produce NA
   out <- cbind(out.phylo, out.se)
   colnames(out) <- c(metric, paste0(metric, '.se'))
   return(out)
