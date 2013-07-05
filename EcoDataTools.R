@@ -1,7 +1,6 @@
 ## No copyright, no warranty
 ## Dominic John Bennett & Junying Lim
-## Last update: 25/06/2013
-## Functions for PD analysis BIG project 2013
+## Last update: 01/07/2013
 
 ## Libraries
 library(picante) # Phylogenetic analytical tools
@@ -11,6 +10,85 @@ library(stringr) #String manipulation tools
 library(RCurl) ##GET and POST to URL queries functionality
 
 ## Dom's Functions:
+deg2dec <- function(data) {
+  # Takes 'coordinate strings' in degrees (D M (S)) and converts to decimals.
+  # Expects coordinate string such: ##'##'##'
+  #   - where: # denotes any number of any length, ' denotes any non-numeric(s).
+  # Function will stop if more than 3 numbers in coordinate string
+  #
+  # Args:
+  #   data: a matrix or dataframe of coordinates (Latitude and Longitude).
+  #
+  # Returns:
+  #   A dataframe of converted coordinates.
+  
+  # input checking
+  if(!is.data.frame(data) & !is.matrix(data)) {
+    stop("Input must be a matrix or dataframe, such:\n
+         Latitude     Longitude\n
+         51 28\'46.92\"  0 0\'29.47\"")
+  }
+  if(ncol(data)!= 2) {
+    stop("Input must have two columns, such:\n
+         Latitude     Longitude\n
+         51 28\'46.92\"  0 0\'29.47\"")
+  }
+  two.numbers <- apply(data, 1:2, function(x) grepl("([^0-9][0-9]|[0-9][^0-9])", x))
+  if(!all(two.numbers)) {
+    print("Invalid data entries:")
+    print(data[!two.numbers])
+    stop("Input must be coordinate character strings with at least 2 numbers, e.g.:\n
+         Latitude     Longitude\n
+         51 28\'46.92\"  0 0\'29.47\"")
+  }
+  
+  # vector inputs
+  x <- data[ ,1] #latitude is x
+  y <- data[ ,2] #longitude is y
+  
+  # find start and end of numbers in coordinate strings
+  index.x1 <- gregexpr("[0-9\\-\\.]+", x)
+  index.x2 <- gregexpr("([0-9\\.][^0-9\\.])|[0-9]$", x)
+  index.y1 <- gregexpr("[0-9\\-\\.]+", y)
+  index.y2 <- gregexpr("([0-9\\.][^0-9\\.])|[0-9]$", y)
+  
+  # vector outputs
+  decimal.x <- rep(NA, nrow(data))
+  decimal.y <- rep(NA, nrow(data))
+  
+  # loop through each row of coordinate string:
+  #   - take the first number in string, add the second number/60
+  #     and then the third/3600
+  #    - stop if more than 3 numbers found.
+  error.message1 <- "\nMore than 3 numbers in:\n data["
+  error.message2 <- "\nTry checking for non-numeric characters in numbers e.g.:\n
+  Here, there is an extra space between the 9 and 2 -- 51 28\'46.9 2\""
+  for(i in 1:nrow(data)) {
+    decimal.x[i] <- as.numeric(substr(x[i], index.x1[[i]][1], index.x2[[i]][1]))
+    for(j in 2:length(index.x1[[i]])) {
+      if(j > 3){stop(paste0(error.message1, 1, ",", i,"] -- ",x[i],error.message2))}
+      division <- ifelse(j == 2, 60, 3600)
+      next.x <- as.numeric(substr(x[i], index.x1[[i]][j], index.x2[[i]][j]))
+      decimal.x[i] <- decimal.x[i] + (next.x/division)
+    }
+    decimal.y[i] <- as.numeric(substr(y[i], index.y1[[i]][1], index.y2[[i]][1]))
+    for(j in 2:length(index.y1[[i]])) {
+      if(j > 3){stop(paste0(error.message1, 2, ",", i,"] -- ",y[i],error.message2))}
+      division <- ifelse(j == 2, 60, 3600)
+      next.y <- as.numeric(substr(y[i], index.y1[[i]][j], index.y2[[i]][j]))
+      decimal.y[i] <- decimal.y[i] + (next.y/division)
+    }
+  }
+  
+  # control for S and W
+  decimal.x <- decimal.x * ifelse(grepl("(S|s)", x), -1, 1)
+  decimal.y <- decimal.y * ifelse(grepl("(W|w)", y), -1, 1)
+  
+  # generate output
+  decimals <- data.frame(Latitude = decimal.x, Longitude = decimal.y)
+  return(decimals)
+}
+
 extractEdges <- function(phylo, taxa, type = 1) {
   # Extract edges from a phylo object using 1 of 3 methods
   #
@@ -24,9 +102,12 @@ extractEdges <- function(phylo, taxa, type = 1) {
   #
   # Return:
   #  vector of edges
-  # TODO: Must revise this to make it more efficient (26/06/2013)
+  # TODO(01/07/2013): this may be more achievable with a vegan matrix
   if (!type %in% c(1,2,3)) {
     stop("Type must be an integer: 1, 2 or 3.")
+  }
+  if (!is.vector(taxa) | !is.character(taxa)) {
+    stop("Invalid or no taxa given.")
   }
   if (length(taxa) == length (phylo$tip.label)){
     return(phylo$edge)
@@ -43,39 +124,43 @@ extractEdges <- function(phylo, taxa, type = 1) {
   edges <- match (match (taxa, phylo$tip.label), phylo$edge[,2])
   end.nodes <- phylo$edge[edges, 1]
   term.node <- length (phylo$tip.label) + 1
-  if (type == 3){
-    while (any (duplicated (end.nodes))){
-      start.node <- end.nodes[duplicated(end.nodes)][1]
-      if (sum (phylo$edge[,1] %in% start.node) == sum (end.nodes %in% start.node)){
+  if (all(end.nodes %in% term.node)) {
+    return(edges)
+  } else {
+    if (type == 3){
+      while (any (duplicated (end.nodes))){
+        start.node <- end.nodes[duplicated(end.nodes)][1]
+        if (sum (phylo$edge[,1] %in% start.node) == sum (end.nodes %in% start.node)){
+          edge <- match (start.node, phylo$edge[,2])
+          end.node <- phylo$edge[edge,1]
+          edges <- c(edges, edge)
+          end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
+        } else {
+          end.nodes <- end.nodes[end.nodes != start.node]
+        }
+      }
+    } else {
+      while (TRUE){
+        end.nodes <- sort (end.nodes, TRUE)
+        start.node <- end.nodes[1]
         edge <- match (start.node, phylo$edge[,2])
         end.node <- phylo$edge[edge,1]
         edges <- c(edges, edge)
         end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      } else {
-        end.nodes <- end.nodes[end.nodes != start.node]
-      }
-    }
-  } else {
-    while (TRUE){
-      end.nodes <- sort (end.nodes, TRUE)
-      start.node <- end.nodes[1]
-      edge <- match (start.node, phylo$edge[,2])
-      end.node <- phylo$edge[edge,1]
-      edges <- c(edges, edge)
-      end.nodes <- c(end.nodes[!end.nodes %in% start.node], end.node)
-      if (type == 2){
-        if (sum (term.node == end.nodes) == length (end.nodes)){
-          break
-        }
-      } else {
-        if (sum (end.nodes[1] == end.nodes) == length (end.nodes)){
-          break
+        if (type == 2){
+          if (sum (term.node == end.nodes) == length (end.nodes)){
+            break
+          }
+        } else {
+          if (sum (end.nodes[1] == end.nodes) == length (end.nodes)){
+            break
+          }
         }
       }
     }
+    return (edges)
   }
-  return (edges)
-  }
+}
 
 commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
                    taxon.names = colnames(comm.data)) {
@@ -132,8 +217,21 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   # Return:
   #  a matrix of community data
   # plot phylogeny, allow space for points
-  variable.max <- 5 + (nrow(comm.data)/4)
-  #variable.max <- ifelse(variable.max > 200, variable.max, 200) #min is 200
+  edges <- extractEdges(phylo, phylo$tip.label[1], type = 2)
+  phylo$edge.length <- phylo$edge.length/sum(phylo$edge.length[edges])
+  # make all phylos the same length before plotting i.e. all branches from terminal
+  # node to tip equal 1
+  # for some weird reason the rules of plotting are dyanmic!
+  if (nrow(comm.data) < 20) {
+    variable.max <- 1 + nrow(comm.data)/20
+    spacing.start <- 0.55
+    spacing.i <- 0.05
+  } else {
+    variable.max <- nrow(comm.data)/10
+    spacing.i <- 0.1 - 1/nrow(comm.data)
+    # some stupid f***ing bizarre eqn! Why is it not linear!?!?!?!
+    spacing.start <- 0.5 + spacing.i
+  }
   plot(phylo, no.margin = no.margin, show.tip.label = FALSE,
        x.lim = c(0, variable.max))
   
@@ -144,7 +242,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   
   # loop init
   ntips <- length(phylo$tip.label)
-  spacing <- 0.75
+  spacing <- spacing.start
   group <- groups[1]
   j <- 1
   
@@ -156,7 +254,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
     abunds <- alphas[i, pull]
     tiplabels(tip = match(taxa, phylo$tip.label),
               pch = 19, adj = spacing, col = hsv(rep(hs[j], ntips), 1, 1, abunds))
-    spacing <- spacing + 0.25
+    spacing <- spacing + spacing.i
     group <- groups[i]
   }
 }
@@ -207,22 +305,24 @@ split0 <- function(r = c(1, 10) , n = 2) {
   return(round((output * (max(r) - min(r))) + min(r)))
 }
 
-genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
+genCommData <- function(phylo, focal, fact = 1, mean.incid, mean.abun = FALSE,
+                        nsites = 1) {
   # Generate clustered/overdispersed data for testing community
-  #  phylogenetic analyses.
+  #  phylogenetic analyses. Return either incidence or abundance data.
   #
   # Args:
   #  phylo - phylo.object, on which the community data will be based
   #  focal - numeric index, indicating which tip to perform cluster/dispersion
-  #  nsites - the number of sites to create
-  #  nspp - the number of species to occur at each site
-  #  clust - if TRUE, data will be clustered else overdispersed
   #  fact - scaling coefficient: larger the number the more pronounced the
   #   effect by a power law (hence 0 not allowed)
+  #  mean.incid - the mean incidence of species in the community
+  #  mean.abun - the mean abundance per site, if given output will be abundances
+  #  nsites - number of sites
   #
   # Return:
   #  a matrix of community data
   invertVector <- function(dists) {
+    # for reversing the probs for overdispersion
     u <- sort(unique(dists), TRUE)
     s <- sort(u)
     probs <- rep(NA, length(dists))
@@ -230,6 +330,21 @@ genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
       probs[u[i] == dists] <- s[i]
     }
     return (probs)
+  }
+  genAbuns <- function(row) {
+    # for generating abundances for each row
+    out.row <- rep(0, ntips)
+    temp.probs <- probs
+    temp.probs[row < 1] <- 0
+    abundance <- abs(ceiling(rnorm(1, mean = mean.abun)))
+    if (abundance == 0) {
+      return (out.row)
+    } else {
+      abuns <- sample(1:ntips, abundance, prob = temp.probs, replace = TRUE)
+      abuns <- table(abuns)
+      out.row[as.numeric(names(abuns))] <- abuns
+      return (out.row)
+    }
   }
   ntips <- length(phylo$tip.label)
   output <- matrix(rep(NA, ntips * nsites),
@@ -241,8 +356,14 @@ genCommData <- function(phylo, focal, nsites, nspp, fact = 1) {
   probs <- focal.dists^abs(fact)
   probs <- probs/sum(probs)
   for (i in 1:nsites) {
-    output[i, ] <- ifelse(1:ntips %in% sample(1:ntips, nspp,
+    incidence <- abs(ceiling(rnorm(1, mean = mean.incid))) # avoid negative numbers
+    output[i, ] <- ifelse(1:ntips %in% sample(1:ntips, incidence,
                                               prob = probs), 1, 0)
+  }
+  if (mean.abun != FALSE) {
+    for (i in 1:nsites) {
+      output[i, ] <- genAbuns(output[i, ])
+    }
   }
   return (output)
 }
@@ -284,19 +405,24 @@ evenCommData <- function(phylo, nsites, nspp) {
 phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
                         type = 1) {
   # Monte-Carlo method for rarefiying community data using common phylogenetic
-  #  metrics. Depends on picante.
+  #  metrics
   #
   # Args:
   #  comm.data: community matrix, species as cols and sites as rows
   #  phylo: phylogeny (ape class)
   #  samp: sample size (minimum incidence of abundance)
-  #  metric: either PD, PSV, PSE, PSR, PSC or PSD, default PD
-  #  nrands: the number of iterations, default 2000
-  #  types: if PD, type of PD to calculate, default 1
+  #  metric: either PD, PSV, PSE, PSR, PSC or PSD
+  #  nrands: the number of iterations
+  #  types: if PD, type of PD to calculate
   #
   # Returns:
   #  matrix of rarefied PD by site and standard error
-  # TODO(27/06/2013): unit test this and add test to wiki
+  if (ncol(comm.data) != length(phylo$tip.label)) {
+    stop("Community data and phylogeny are different sizes.")
+  } 
+  if (!any(phylo$tip.label %in% colnames(comm.data))) {
+    stop("Phylogeny tip names and community data names do not match.")
+  }
   if (any(rowSums(comm.data) < samp)) {
     stop("Some sites have incidence/abundance less than samp")
   }
@@ -347,7 +473,7 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
     return(as.vector(psd(plucked, phylo)[ ,1]))
   }
   calcSE <- function (x) {
-    return (sd(x)/sqrt(length(x)))
+    return (sd(x, na.rm = TRUE)/sqrt(length(x)))
   }
   # now for the actual calculations ...
   mat <- as.matrix(comm.data)
@@ -366,8 +492,9 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
   } else {
     stop('Unknown metric. Use: PD, PSV, PSE, PSR, PSC or PSD')
   }
-  out.phylo <- apply(mat.phylo, 1, mean)
+  out.phylo <- apply(mat.phylo, 1, mean, na.rm = TRUE)
   out.se <- apply(mat.phylo, 1, calcSE)
+  # certain metrics can produce NA
   out <- cbind(out.phylo, out.se)
   colnames(out) <- c(metric, paste0(metric, '.se'))
   return(out)
