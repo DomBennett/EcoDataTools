@@ -522,3 +522,62 @@ taxo2newick <-function(x, backbone = TRUE, backbonenewick, hightaxo, lowtaxo){
   }
   return(base)
 }
+
+#osgf_to_en (Author: J. Lim)
+#Finds centroids of British Ordinance Survey grid references and converts them to Eastings and Northings
+#Accepts a vector of grid references and returns a data frame of eastings and northings 
+#Works with both 2 (100x100 km), 4 (10x10 km), 6 (1x1 km) charactodigit grid reference numbers
+
+osgf_to_en <- function(x){
+
+hectads <- c("HP", "HT", "HU", "HW", "HX", "HY", "HZ", "NA", "NB", "NC", "ND", "NF", "NG", "NH", "NJ", "NK", "NL", "NM", "NN", "NO", "NR", "NS", "NT", "NU", "NW", "NX", "NY", "NZ", "OV", "SC", "SD", "SE", "SH", "SJ", "SK", "SM", "SN", "SO", "SP", "SR", "SS", "ST", "SU", "SV", "SW", "SX", "SY", "SZ", "TA", "TF", "TG", "TL", "TM", "TQ", "TR", "TV")
+X <- c(4, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 2, 3, 4, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5, 5, 6, 5, 6, 5, 6, 5)
+Y <- c(12,11,11,10,10,10,10,9, 9, 9, 9, 8, 8, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 4, 3, 3, 2, 2, 1, 1, 0)
+
+res <- nchar(x[1])
+eastings <- rep(NA, length(x))
+northings <- rep(NA, length(x))
+gridletter <- rep(NA, length(x))
+x2 <- x1 <- rep(NA, length(x))
+y2 <- y1 <- rep(NA, length(x))
+
+if(res == 2){
+	for(i in 1:length(x)){
+		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+	}
+}
+if(res == 4){
+	for(i in 1:length(x)){
+		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+		x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
+		y1[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
+	}
+} 
+if(res == 6){
+	for(i in 1:length(x)){
+		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+		x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
+		x2[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
+		y1[i] <- as.numeric(substr(x[i], start = 5, stop = 5))
+		y2[i] <- as.numeric(substr(x[i], start = 6, stop = 6))
+	}
+}
+
+	for(i in 1:length(x)){
+		if(res == 2){
+			index <- match(gridletter[i], hectads)
+			eastings[i] <- (X[index] * 100000) + 50000
+			northings[i] <- (Y[index] * 100000) + 50000
+		}
+		if(res == 4){
+			index <- match(gridletter[i], hectads)
+			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + 5000 
+			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + 5000	
+			} else {
+			index <- match(gridletter[i], hectads)
+			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + (x2[i] * 1000) + 500 
+			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + (x2[i] * 1000) + 500
+			}
+	}
+	data.frame(hectad = x, eastings, northings)
+}
