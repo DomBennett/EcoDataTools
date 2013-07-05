@@ -693,18 +693,32 @@ if(res == 6){
 	for(i in 1:length(x)){
 		if(res == 2){
 			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000) + 50000
-			northings[i] <- (Y[index] * 100000) + 50000
+			eastings[i] <- (X[index] * 100000)
+			northings[i] <- (Y[index] * 100000)
 		}
 		if(res == 4){
 			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + 5000 
-			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + 5000	
+			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000)
+			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000)	
 			} else {
 			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + (x2[i] * 1000) + 500 
-			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + (x2[i] * 1000) + 500
+			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + (x2[i] * 1000) 
+			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + (x2[i] * 1000)
 			}
+	}
+	if(centroid == TRUE){
+		if(res == 2){
+			eastings <- eastings + 50000
+			northings <- northings + 50000
+		}
+		if(res == 4){
+			eastings <- eastings + 5000
+			northings <- northings + 5000
+		}
+		if(res == 6){
+			eastings <- eastings + 500
+			northings <- northings + 500
+		}
 	}
 	data.frame(hectad = x, eastings, northings)
 }
