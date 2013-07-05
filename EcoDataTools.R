@@ -528,7 +528,7 @@ taxo2newick <-function(x, backbone = TRUE, backbonenewick, hightaxo, lowtaxo){
 #Accepts a vector of grid references and returns a data frame of eastings and northings 
 #Works with both 2 (100x100 km), 4 (10x10 km), 6 (1x1 km) charactodigit grid reference numbers
 
-osgf_to_en <- function(x){
+osgr_to_en <- function(x){
 
 hectads <- c("HP", "HT", "HU", "HW", "HX", "HY", "HZ", "NA", "NB", "NC", "ND", "NF", "NG", "NH", "NJ", "NK", "NL", "NM", "NN", "NO", "NR", "NS", "NT", "NU", "NW", "NX", "NY", "NZ", "OV", "SC", "SD", "SE", "SH", "SJ", "SK", "SM", "SN", "SO", "SP", "SR", "SS", "ST", "SU", "SV", "SW", "SX", "SY", "SZ", "TA", "TF", "TG", "TL", "TM", "TQ", "TR", "TV")
 X <- c(4, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 2, 3, 4, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5, 5, 6, 5, 6, 5, 6, 5)
