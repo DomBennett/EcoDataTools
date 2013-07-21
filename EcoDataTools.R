@@ -1,6 +1,6 @@
 ## No copyright, no warranty
 ## Dominic John Bennett & Junying Lim
-## Last update: 01/07/2013
+## Last update: 21/07/2013
 
 ## Libraries
 library(picante) # Phylogenetic analytical tools
@@ -87,6 +87,60 @@ deg2dec <- function(data) {
   # generate output
   decimals <- data.frame(Latitude = decimal.x, Longitude = decimal.y)
   return(decimals)
+}
+
+meanPhylo <- function(phylo.dist, phylo.size = 5, min.phylos = 2) {
+  # Take a distribution of phylogenies and return the mean phylogeny, using mean
+  #  branch distances and the neighbour-joining algorithm
+  #
+  # Args:
+  #  phylo.dist: a list of phylo objects with shared tips
+  #  phylo.size: the minimum number of tips for a mean to be calculated
+  #  min.phylos: the minimum number of phylogenies for a mean to be calculated
+  #
+  # Returns:
+  #  a phylo object
+  phylo.sizes <- sapply(phylo.dist, function(x) length(x$tip.label))
+  if (max(phylo.sizes) < phylo.size) stop("All phylogenies have fewer tips than phylo.size")
+  # I want to have the phylogenies 'overlapping' so drop ones that are too big
+  #  to avoid having species that are represented by few phylogenies
+  max.size <- mean(phylo.sizes) + mean(phylo.sizes) * 0.75
+  min.size <- mean(phylo.sizes) - mean(phylo.sizes) * 0.25
+  keep <- phylo.sizes > min.size & phylo.sizes < max.size 
+  if (sum(keep) < min.phylos) stop("Fewer than min.phylos phylogenies of appropriate size")
+  phylo.dist <- phylo.dist[keep]
+  phylo.mats <- list()
+  species.vec <- vector()
+  # generate distance matrices for each phylogeny
+  for (i in 1:length(phylo.dist)) {
+    phylo.mats <- c(phylo.mats, list(cophenetic.phylo(phylo.dist[[i]])))
+    species.vec <- c(species.vec, phylo.dist[[i]]$tip.label)
+  }
+  species.vec <- unique(species.vec)
+  combs <- combn(species.vec, 2)
+  comb.dists <- vector("list", ncol(combs))
+  # extract distances from matrices for each combinate
+  for (i in 1:length(phylo.mats)) {
+    for (j in 1:ncol(combs)) {
+      c <- combs[1, j] == colnames(phylo.mats[[i]])
+      r <- combs[2, j] == rownames(phylo.mats[[i]])
+      if (any(c) & any(r)) {
+        comb.dists[[j]] <- c(comb.dists[[j]], phylo.mats[[i]][c, r])
+      }
+    }
+  }
+  mean.mat <- matrix(rep(0, length(species.vec)^2),
+                     nrow = length(species.vec), ncol = length(species.vec))
+  rownames(mean.mat) <- colnames(mean.mat) <- species.vec
+  # take means and put into a matrix
+  for (i in 1:ncol(combs)) {
+    temp.dist <- mean(comb.dists[[i]])
+    sp1.pos <- species.vec == combs[1, i]
+    sp2.pos <- species.vec == combs[2, i]
+    mean.mat[sp1.pos, sp2.pos] <- temp.dist
+    mean.mat[sp2.pos, sp1.pos] <- temp.dist
+  }
+  return (nj(mean.mat))
 }
 
 extractEdges <- function(phylo, taxa, type = 1) {

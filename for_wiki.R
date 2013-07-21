@@ -1,9 +1,12 @@
 ## Dominic Bennett
-## 27/06/2013
+## 21/07/2013
 ## Generate test data and images for wiki
 
 ## Dirs
 source('EcoDataTools.R')
+
+## set.seed
+set.seed(4)
 
 ## extractEdges()
 # showing the different types
@@ -33,7 +36,7 @@ edges <- extractEdges(phylo, taxa, type = 3)
 plotEdges(phylo, edges)
 mtext("Type 3: branches uniquely represented by the taxa", line = 2)
 mtext(paste("PD:", sum(phylo$edge.length[edges]), "   min: 1"))
-close.screen(all.screens = TRUE)
+close.screen(al = TRUE)
 dev.off()
 # example usage
 phylo <- read.tree(file.path("wiki","Phylocom_phylo.tre"))
@@ -97,4 +100,36 @@ type2 <- genCommData(phylo, focal = 16, fact = -1, mean.incid = 5, nsites = 10,
 all <- rbind(type1, type2)
 types <- paste0('t', rep(1:5, each = 10))
 plotComm(all, phylo, groups = types)
+dev.off()
+
+## Testing meanPhylo() 21/07/2013
+# Generate distribution
+nphylos <- 30
+standard.dev <- 5
+ori.phylo <- stree(32, 'balanced')
+ori.phylo$edge.length <- rep(1, nrow(ori.phylo$edge))
+phylo.dist <- list()
+rand.phy.sizes <- ceiling(abs(rnorm(nphylos, sd = standard.dev)))
+blength.modifier <- runif(nphylos, min = 0, max = 2)
+for (i in 1:nphylos) {
+  temp.phylo <- drop.tip(ori.phylo, sample(ori.phylo$tip.label,
+                                            rand.phy.sizes[i]))
+  temp.phylo$edge.length <- temp.phylo$edge.length * blength.modifier[i]
+  phylo.dist <- c(phylo.dist, list(temp.phylo))
+}
+# Calculate mean tree
+mean.phylo <- meanPhylo(phylo.dist)
+topodist <- dist.topo(mean.phylo, unroot(ori.phylo))
+bdist <- dist.topo(mean.phylo, unroot(ori.phylo), method = 'score')
+png(filename = file.path("wiki", "meanPhylo_example.png"))
+split.screen(c(1,2))
+screen(1)
+plot(mean.phylo, type = 'unrooted')
+mtext("Mean phylogeny")
+mtext(paste0("Topological Distance = ", topodist), side = 1)
+mtext(paste0("Branch Len. Distance = ", signif(bdist, 2)), side = 1, line = 1)
+screen(2)
+plot(unroot(ori.phylo), type = 'unrooted')
+mtext("Original phylogeny")
+close.screen(all.screens = TRUE)
 dev.off()
