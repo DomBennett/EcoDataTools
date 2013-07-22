@@ -509,7 +509,7 @@ commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
 }
 
 plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
-                     no.margin = TRUE){
+                     no.margin = TRUE, ...){
   # Plot community data on community phylogeny to visualise
   #  differences in community structure. Use colours to distinguish
   #  site groups and alpha to distinguish abundances (works like rainbow())
@@ -538,7 +538,7 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
     spacing.start <- 0.5 + spacing.i
   }
   plot(phylo, no.margin = no.margin, show.tip.label = FALSE,
-       x.lim = c(0, variable.max))
+       x.lim = c(0, variable.max), ...)
   
   # generate alphas based on abundances
   n <- length(unique(groups))
