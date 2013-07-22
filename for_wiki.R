@@ -165,7 +165,7 @@ scenario5 <- rbind(genCommData(phylo, focal = 15, fact = 2, mean.incid = 4,
                      genCommData(phylo, focal = 4, fact = 2, mean.incid = 4,
                                  mean.abun = 8, nsites = 20))
 htypes <- as.character(c(rep(1, 20), rep(2, 20)))
-png(filename = file.path("wiki", "genNullDist_scenarios.png"))
+png(filename = file.path("wiki", "genNullDist_scenarios.png"), width = 720)
 par(mfrow = c(2,3))
 plotComm(scenario0, phylo, no.margin = FALSE, groups = htypes)
 mtext("Scenario 0", 3, 1)
