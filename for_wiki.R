@@ -133,3 +133,50 @@ plot(unroot(ori.phylo), type = 'unrooted')
 mtext("Original phylogeny")
 close.screen(all.screens = TRUE)
 dev.off()
+
+## Testing genNullDist() 22/07/2013
+phylo <- stree(n = 32, "balanced", tip.label = as.character(1:32))
+phylo$edge.length <- rep(1, length(phylo$edge)) # need to add lengths!
+set.seed(4) # 2, 4, 55
+scenario0 <- genCommData(phylo, focal = 26, fact = 0, mean.incid = 8,
+                         mean.abun = 16, nsites = 40)
+scenario1 <- rbind(genCommData(phylo, focal = 26, fact = 0, mean.incid = 12,
+                               mean.abun = 24, nsites = 20),
+                   genCommData(phylo, focal = 26, fact = 0, mean.incid = 2,
+                               mean.abun = 4, nsites = 20))
+scenario2 <- rbind(genCommData(phylo, focal = 26, fact = 0, mean.incid = 6,
+                               mean.abun = 12, nsites = 20),
+                   genCommData(phylo, focal = 26, fact = 2, mean.incid = 6,
+                               mean.abun = 12, nsites = 20))
+scenario3 <- rbind(genCommData(phylo, focal = 26, fact = -2, mean.incid = 6,
+                               mean.abun = 12, nsites = 20),
+                   genCommData(phylo, focal = 26, fact = 2, mean.incid = 6,
+                               mean.abun = 24, nsites = 20))
+scenario4 <- rbind(genCommData(phylo, focal = 26, fact = 2, mean.incid = 6,
+                               mean.abun = 12, nsites = 20),
+                   genCommData(phylo, focal = 6, fact = 2, mean.incid = 6,
+                               mean.abun = 12, nsites = 20))
+scenario5 <- rbind(genCommData(phylo, focal = 15, fact = 2, mean.incid = 4,
+                               mean.abun = 8, nsites = 20) +
+                     genCommData(phylo, focal = 17, fact = 2, mean.incid = 4,
+                                 mean.abun = 8, nsites = 20),
+                   genCommData(phylo, focal = 28, fact = 2, mean.incid = 4,
+                               mean.abun = 8, nsites = 20) +
+                     genCommData(phylo, focal = 4, fact = 2, mean.incid = 4,
+                                 mean.abun = 8, nsites = 20))
+htypes <- as.character(c(rep(1, 20), rep(2, 20)))
+png(filename = file.path("wiki", "genNullDist_scenarios.png"))
+par(mfrow = c(2,3))
+plotComm(scenario0, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 0", 3, 1)
+plotComm(scenario1, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 1", 3, 1)
+plotComm(scenario2, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 2", 3, 1)
+plotComm(scenario3, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 3", 3, 1)
+plotComm(scenario4, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 4", 3, 1)
+plotComm(scenario5, phylo, no.margin = FALSE, groups = htypes)
+mtext("Scenario 5", 3, 1)
+dev.off()

@@ -89,6 +89,257 @@ deg2dec <- function(data) {
   return(decimals)
 }
 
+genNullDist <- function(phylo, comm.data, htypes, null = 0, nrands = 2000,
+                        metric = "pse") {
+  # Generate null distributions of differences for the specified phylogenetic
+  #  metric between habitat type 1 and habitat type 2 (1 - 2) for community data
+  #  using null models as described by Helmus et al 2010.
+  #
+  # Args:
+  #  phylo: phylo object of the community data
+  #  comm.data: community matrix (species columns, sites rows)
+  #  htypes: vector of habitat types for each site (only 2 types allowed!)
+  #  null: number of null distribution. Null = 0, randomisation test, Nulls 1 to 5
+  #   null distributions as described by Helmus et al 2010
+  #  nrands: number of iterations
+  #  metric: either PSE or PSV at this stage
+  #
+  # Return:
+  #  vector of null differences
+  #
+  # TODO(05/07/2013): This code is HORRENDOUSLY long! I've done this to avoid if
+  #  statements in for loops, but there must be a better way of doing it!
+  randPrev <- function(mat) {
+    ## Randomise prevalences
+    spp.names <- colnames(mat)
+    out <- t(apply(mat, 1, sample))
+    colnames(out) <- spp.names
+    return (out)
+  }
+  randRich <- function(mat) {
+    ## Randomise richnesses
+    return (apply(mat, 2, sample))
+  }
+  randomise <- function(mat) {
+    ## Randomise both
+    mat <- randPrev(mat)
+    mat <- randRich(mat)
+    return (mat)
+  }
+  if (metric == "psv") {
+    null0 <- function(null.dist) {
+      ## Randomise richness and prevalence
+      for (i in 1:nrands) {
+        temp.data <- randomise(comm.data)
+        temp.phymet <- psv(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null1 <- function(null.dist) {
+      ## Randomise site richnesses
+      for (i in 1:nrands) {
+        temp.data <- randRich(comm.data)
+        temp.phymet <- psv(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null2 <- function(null.dist) {
+      ## Randomise species prevalences
+      for (i in 1:nrands) {
+        temp.data <- randPrev(comm.data)
+        temp.phymet <- psv(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null3 <- function(null.dist) {
+      ## Randomise within the habitat types
+      u.htypes <- unique(htypes)
+      data.htype.1 <- comm.data[htypes == u.htypes[1], ]
+      data.htype.2 <- comm.data[htypes == u.htypes[2], ]
+      for (i in 1:nrands) {
+        temp.data <- rbind(randRich(data.htype.1), randRich(data.htype.2))
+        temp.phymet <- psv(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null45 <- function(null.dist, data.rand, data.frozen) {
+      ## 4 -- Maintain the species that are gained
+      ## 5 -- Maintain the species that are lost
+      for (i in 1:nrands) {
+        temp.data <- cbind(randPrev(data.rand), data.frozen)
+        temp.phymet <- psv(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null.dist <- rep(NA, nrands)
+    if (null == 0) {
+      null.dist <- null0(null.dist)
+    } else if (null == 1) {
+      null.dist <- null1(null.dist)
+    } else if (null == 2) {
+      null.dist <- null2(null.dist)
+    } else if (null == 3) {
+      null.dist <- null3(null.dist)
+    } else if (null == 4 | null == 5){
+      u.htypes <- unique(htypes)
+      diffs <- colSums(comm.data[htypes == u.htypes[1], ]) -
+        colSums(comm.data[htypes == u.htypes[2], ])
+      if (null == 4) {
+        gains <- ifelse(diffs < 0, 1, 0)
+        data.rand <- as.matrix(comm.data[ , gains == 0])
+        data.frozen <- as.matrix(comm.data[ , gains == 1])
+        if (length(data.rand) <= nrow(comm.data)) {
+          # if 1 or fewer species decrease -- no randomisation can be performed
+          temp.phymet <- psv(comm.data, phylo)[ ,1]
+          habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+          diff <- habitat.means[1] - habitat.means[2]
+          null.dist <- rep(diff, nrands)
+        } else if (length(data.frozen) <= nrow(comm.data)){
+          # if all - 1 or more species increase -- no randomisation can be performed
+          null.dist <- null2(null.dist)
+        } else {
+          null.dist <- null45(null.dist, data.rand, data.frozen)
+        }
+      } else {
+        losses <- ifelse(diffs > 0, 1, 0)
+        data.rand <- as.matrix(comm.data[ , losses == 0])
+        data.frozen <- as.matrix(comm.data[ , losses == 1])
+        if (length(data.rand) <= nrow(comm.data)) {
+          # if 1 or fewer species decrease -- no randomisation can be performed
+          temp.phymet <- psv(data.frozen, phylo)[ ,1]
+          habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+          diff <- habitat.means[1] - habitat.means[2]
+          null.dist <- rep(diff, nrands)
+        } else if (length(data.frozen) <= nrow(comm.data)){
+          # if all - 1 or more species increase -- no randomisation can be performed
+          null.dist <- null2(null.dist)
+        } else {
+          null.dist <- null45(null.dist, data.rand, data.frozen)
+        }
+      }
+    } else {
+      stop("Null must be a number 0-5")
+    }
+  } else if (metric == "pse") {
+    null0 <- function(null.dist) {
+      ## Randomise richness and prevalence
+      for (i in 1:nrands) {
+        temp.data <- randomise(comm.data)
+        temp.phymet <- pse(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null1 <- function(null.dist) {
+      ## Randomise site richnesses
+      for (i in 1:nrands) {
+        temp.data <- randRich(comm.data)
+        temp.phymet <- pse(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null2 <- function(null.dist) {
+      ## Randomise species prevalences
+      for (i in 1:nrands) {
+        temp.data <- randPrev(comm.data)
+        temp.phymet <- pse(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null3 <- function(null.dist) {
+      ## Randomise within the habitat types
+      u.htypes <- unique(htypes)
+      data.htype.1 <- comm.data[htypes == u.htypes[1], ]
+      data.htype.2 <- comm.data[htypes == u.htypes[2], ]
+      for (i in 1:nrands) {
+        temp.data <- rbind(randRich(data.htype.1), randRich(data.htype.2))
+        temp.phymet <- pse(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null45 <- function(null.dist, data.rand, data.frozen) {
+      ## 4 -- Maintain the species that are gained
+      ## 5 -- Maintain the species that are lost
+      for (i in 1:nrands) {
+        temp.data <- cbind(randPrev(data.rand), data.frozen)
+        temp.phymet <- pse(temp.data, phylo)[ ,1]
+        habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+        null.dist[i] <- habitat.means[1] - habitat.means[2]
+      }
+      return (null.dist)
+    }
+    null.dist <- rep(NA, nrands)
+    if (null == 0) {
+      null.dist <- null0(null.dist)
+    } else if (null == 1) {
+      null.dist <- null1(null.dist)
+    } else if (null == 2) {
+      null.dist <- null2(null.dist)
+    } else if (null == 3) {
+      null.dist <- null3(null.dist)
+    } else if (null == 4 | null == 5){
+      u.htypes <- unique(htypes)
+      diffs <- colSums(comm.data[htypes == u.htypes[1], ]) -
+        colSums(comm.data[htypes == u.htypes[2], ])
+      if (null == 4) {
+        gains <- ifelse(diffs < 0, 1, 0)
+        data.rand <- as.matrix(comm.data[ , gains == 0])
+        data.frozen <- as.matrix(comm.data[ , gains == 1])
+        if (length(data.rand) <= nrow(comm.data)) {
+          # if 1 or fewer species decrease -- no randomisation can be performed
+          temp.phymet <- pse(comm.data, phylo)[ ,1]
+          habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+          diff <- habitat.means[1] - habitat.means[2]
+          null.dist <- rep(diff, nrands)
+        } else if (length(data.frozen) <= nrow(comm.data)){
+          # if all - 1 or more species increase -- no randomisation can be performed
+          null.dist <- null2(null.dist)
+        } else {
+          null.dist <- null45(null.dist, data.rand, data.frozen)
+        }
+      } else {
+        losses <- ifelse(diffs > 0, 1, 0)
+        data.rand <- as.matrix(comm.data[ , losses == 0])
+        data.frozen <- as.matrix(comm.data[ , losses == 1])
+        if (length(data.rand) <= nrow(comm.data)) {
+          # if 1 or fewer species decrease -- no randomisation can be performed
+          temp.phymet <- pse(data.frozen, phylo)[ ,1]
+          habitat.means <- tapply(temp.phymet, htypes, mean, na.rm = TRUE)
+          diff <- habitat.means[1] - habitat.means[2]
+          null.dist <- rep(diff, nrands)
+        } else if (length(data.frozen) <= nrow(comm.data)){
+          # if all - 1 or more species increase -- no randomisation can be performed
+          null.dist <- null2(null.dist)
+        } else {
+          null.dist <- null45(null.dist, data.rand, data.frozen)
+        }
+      }
+    } else {
+      stop("Null must be a number 0-5")
+    }
+  } else {
+    stop("Invalid metric provided. Must be either psv or pse.")
+  }
+  return (null.dist)
+}
+
 meanPhylo <- function(phylo.dist, phylo.size = 5, min.phylos = 2) {
   # Take a distribution of phylogenies and return the mean phylogeny, using mean
   #  branch distances and the neighbour-joining algorithm
