@@ -104,34 +104,46 @@ dev.off()
 
 ## Testing meanPhylo() 21/07/2013
 # Generate distribution
-nphylos <- 30
-standard.dev <- 5
-ori.phylo <- stree(32, 'balanced')
-ori.phylo$edge.length <- rep(1, nrow(ori.phylo$edge))
-phylo.dist <- list()
-rand.phy.sizes <- ceiling(abs(rnorm(nphylos, sd = standard.dev)))
-blength.modifier <- runif(nphylos, min = 0, max = 2)
-for (i in 1:nphylos) {
-  temp.phylo <- drop.tip(ori.phylo, sample(ori.phylo$tip.label,
-                                            rand.phy.sizes[i]))
-  temp.phylo$edge.length <- temp.phylo$edge.length * blength.modifier[i]
-  phylo.dist <- c(phylo.dist, list(temp.phylo))
+nphyloss <- seq(5, 200, 5)
+topodists <- bdists <- vector()
+for (nphylos in nphyloss) {
+  standard.dev <- 5
+  ori.phylo <- stree(32, 'balanced')
+  ori.phylo$edge.length <- rep(1, nrow(ori.phylo$edge))
+  phylo.dist <- list()
+  rand.phy.sizes <- ceiling(abs(rnorm(nphylos, sd = standard.dev)))
+  blength.modifier <- runif(nphylos, min = 0, max = 2)
+  for (i in 1:nphylos) {
+    temp.phylo <- drop.tip(ori.phylo, sample(ori.phylo$tip.label,
+                                             rand.phy.sizes[i]))
+    temp.phylo$edge.length <- temp.phylo$edge.length * blength.modifier[i]
+    phylo.dist <- c(phylo.dist, list(temp.phylo))
+  }
+  mean.phylo <- meanPhylo(phylo.dist)
+  topodists <- c(topodists, dist.topo(mean.phylo, unroot(ori.phylo)))
+  bdists <- c(bdists, dist.topo(mean.phylo, unroot(ori.phylo), method = 'score'))
 }
 # Calculate mean tree
-mean.phylo <- meanPhylo(phylo.dist)
-topodist <- dist.topo(mean.phylo, unroot(ori.phylo))
-bdist <- dist.topo(mean.phylo, unroot(ori.phylo), method = 'score')
-png(filename = file.path("wiki", "meanPhylo_example.png"))
+png(filename = file.path("wiki", "meanPhylo_example.png"), width = 720)
 split.screen(c(1,2))
 screen(1)
 plot(mean.phylo, type = 'unrooted')
 mtext("Mean phylogeny")
-mtext(paste0("Topological Distance = ", topodist), side = 1)
-mtext(paste0("Branch Len. Distance = ", signif(bdist, 2)), side = 1, line = 1)
+mtext(paste0("Topological Distance = ", topodists[length(topodists)]), side = 1)
+mtext(paste0("Branch Len. Distance = ", signif(bdists[length(bdists)], 2)),
+      side = 1, line = 1)
+mtext(paste0("Estimated from ", nphylos, " phylogenies."), side = 1, line = 2)
 screen(2)
 plot(unroot(ori.phylo), type = 'unrooted')
 mtext("Original phylogeny")
 close.screen(all.screens = TRUE)
+dev.off()
+png(filename = file.path("wiki", "meanPhylo_hownphyloshelps.png"), width = 720)
+par(mfrow = c(1,2))
+plot(topodists~nphyloss, pch = 19,
+     ylab = "Topological Distance", xlab = "Number of phylogenies used")
+plot(bdists~nphyloss, pch = 19,
+     ylab = "Branch Length Distance", xlab = "Number of phylogenies used")
 dev.off()
 
 ## Testing genNullDist() 22/07/2013
