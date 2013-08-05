@@ -806,62 +806,89 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
 }
 
 ## Jun's Functions
-phylotraitdist <- function(native, alien, phy, trait){
-               #Print statements
-	print(paste(dim(trait)[2], " traits found...", sep = ""))
-	#Diagnostic checks on phylogeny
-	taxon <- c(native, alien)
-	if(sum(taxon %in% testphy$tip.label) != length(taxon)){
-		print("Phylogeny does not contain all the taxa. Missing taxa will be excluded.")
-	}
-	tip <- phy$tip.label[!phy$tip.label %in% taxon] 
-	trimmedphy <- drop.tip(phy, tip = tip) #Removing taxa that are not found
-	#Diagnostic check on traits 
-	if(sum(taxon %in% rownames(trait) != length(taxon))){
-		print("Trait dataframe does not contain all the taxa. Missing taxa will be excluded.")
-	}
-	trait <- trait[rownames(trait) %in% taxon,] #Removing taxa that are not found
-	alien <- intersect(intersect(alien, phy$tip.label), rownames(trait)) #Alien taxa found
-	#Results vectors
-	pnnd <- NULL
-	traitdiff <- NULL
-	#Distance matrices
-	phydist <- cophenetic(trimmedphy) #Calculating phylogenetic distance matrix
-	order <- match(taxon, colnames(phydist))
-	phydist <- phydist[order,order]
-	traitdist <- vector("list", length(colnames(trait)))
-	for(j in 1:length(colnames(trait))){
-		if(is.factor(trait[,j]) == TRUE){
-			levels(trait[,j]) <- 1:length(levels(trait[,j])) #Convert levels of trait into numerical values
-			temp <- decostand(dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE), method = "pa")
-			temp <- as.matrix(temp)
-			rownames(temp) <- colnames(temp) <- rownames(trait)
-			order <- match(taxon, colnames(temp))
-			traitdist[[j]] <- temp[order,order]
-		} else {
-			temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
-			temp <- as.matrix(temp)
-			rownames(temp) <- colnames(temp) <- rownames(trait)
-			order <- match(taxon, colnames(temp))
-			traitdist[[j]] <- temp[order,order]
-		}
-	} #Produces list of trait distance matrices
-	#Find non-native index on cophenetic
-	exclude <- colnames(phydist) %in% alien
-	for(i in alien){
-		temp <- phydist[!exclude,] #Remove all non-natives from matrix
-		closest.nat <- which.min(temp[, colnames(phydist) %in% i]) #Find closest native by looking at minimum phylogenetic distance
-		pnnd <- c(pnnd, temp[closest.nat, colnames(phydist) %in% i])
-		for(j in 1:length(traitdist)){
-			temp <- traitdist[[j]][!exclude,]
-			traitdiff <- append(traitdiff, temp[closest.nat , colnames(traitdist[[j]]) %in% i])
-		}
-	}
-	pnndresults <- data.frame(taxon = alien, pnnd = pnnd)
-	traitresults <- matrix(data = traitdiff, nrow = length(alien), ncol = length(colnames(trait)), byrow = TRUE)
-	colnames(traitresults) <- paste(colnames(trait), ".diff", sep = "")
-	return(cbind(pnndresults, traitresults))
+phylodist <- function(natives, aliens, phy){
+  #Diagnostic checks
+  taxon <- c(natives, aliens)
+  if(sum(taxon %in% phy$tip.label) != length(taxon)){
+    print("Phylogeny does not contain all the taxa. PNND for missing taxa cannot be calculated and will be ignored.")
+  }
+  tip <- phy$tip.label[!phy$tip.label %in% taxon] 
+  trimmedphy <- drop.tip(phy, tip = tip) #Removing taxa that are not found; phylogeny ONLY contains natives and aliens
+  trimmedaliens <- aliens[aliens %in% trimmedphy$tip.label] #New aliens list which now no longer contains aliens not represented in the tree
+  #Results vectors
+  pnnd <- NULL
+  mpd <- NULL
+  closest.nat <- NULL
+  #Distance matrices
+  phydist <- cophenetic(trimmedphy) #Generate phylogenetic distance matrix
+  order <- match(taxon, colnames(phydist)) #Find index of rows for taxa
+  phydist <- phydist[order, order] #Ensuring that the rows are sorted in the same order as taxa
+  exclude <- which(colnames(phydist) %in% aliens == TRUE) #Find rows for aliens
+  temp <- phydist[-exclude, ,drop = FALSE] #Remove all non-natives rows from matrix
+  for(i in aliens){
+    alien.ind <- colnames(temp) %in% i
+    alien.col <- temp[, alien.ind]
+    closest.native.ind <- which.min(alien.col) #Find row containing minimum phylogenetic distance along column; shouldn't be any other non-natives, or itself among the rows
+    closest.nat <- c(closest.nat, rownames(temp)[closest.native.ind]) #Extract closest native taxon name
+    pnnd <- c(pnnd, temp[closest.native.ind, alien.ind]) #Extract phylogenetic distance
+    mpd <- c(mpd, sum(alien.col) / dim(alien.col)[1])
+  }
+  data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
 }
+
+#Creates a list of trait matrices
+traitdistlist <- function(trait){
+  ntrait <- length(colnames(trait))
+  traitdist <- vector("list", ntrait)
+  names(traitdist) <- colnames(trait)
+  for(j in 1:ntrait){
+    if(is.factor(trait[,j]) == TRUE){
+      levels(trait[,j]) <- 1:length(levels(trait[,j])) #Convert levels of trait into numerical values
+      temp <- decostand(dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE), method = "pa")
+      temp <- as.matrix(temp)
+      rownames(temp) <- colnames(temp) <- rownames(trait)
+      traitdist[[j]] <- temp
+    } else {
+      temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
+      temp <- as.matrix(temp)
+      rownames(temp) <- colnames(temp) <- rownames(trait)
+      traitdist[[j]] <- temp
+    }
+  }
+  return(traitdist)
+}
+
+# Calculates trait distance based on closest native
+traitdist <- function(closest.native, aliens, traitdistlist){
+  stopifnot(length(aliens) == length(closest.native)) #Error catching
+  traitdiff <- NULL
+  for(i in 1:length(aliens)){
+    for(j in 1:length(traitdistlist)){
+      alien.col <- which(rownames(traitdistlist[[j]]) %in% aliens[i] == TRUE)
+      native.row <- which(rownames(traitdistlist[[j]]) %in% closest.native[i] == TRUE)
+      traitdiff <- c(traitdiff, traitdistlist[[j]][native.row, alien.col])
+    }
+  }
+  traitresults <- matrix(data = traitdiff, nrow = length(aliens), ncol = length(traitdistlist), byrow = TRUE)
+  colnames(traitresults) <- paste(names(traitdistlist), ".diff", sep = "")
+  traitresults <- as.data.frame(traitresults)
+  traitresults$taxon <- aliens
+  return(traitresults)
+}
+
+#Testing phylo and trait distance functions
+#taxon <- c("spA", "spB", "spC", "spD", "spE", "spF")
+#testphy <- rtree(6)
+#testphy$tip.label <- c("spA", "spC", "spD", "spE", "spF", "spB")
+#trait <- data.frame(height = c(1,2,3,2,1,2), life.form = c("A","B","A","B", "C", "D"))
+#rownames(trait) <- c("spA", "spB", "spC", "spD", "spE", "spF")
+#x <- pnnd(natives = taxon[1:2], aliens = taxon[3:6], phy = testphy)
+#y <- traitdistlist(trait)
+#z <- traitdist(aliens = x$taxon, closest.native = x$closest.nat, y, trait)
+#a <- merge(x, z)
+#a$life.form.diff <- as.factor(a$life.form.diff)
+#mod <- aov(a$pnnd~a$height.diff*a$life.form.diff)
+#summary(mod)
 
 taxa2phylomatic <- function(taxa, output.dir, output.name, binom, storedtree){
   storedtree= "R20120829"
