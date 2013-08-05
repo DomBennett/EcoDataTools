@@ -827,7 +827,7 @@ phylodist <- function(natives, aliens, phy){
   temp <- phydist[-exclude, ,drop = FALSE] #Remove all non-natives rows from matrix
   for(i in aliens){
     alien.ind <- colnames(temp) %in% i
-    alien.col <- temp[, alien.ind]
+    alien.col <- temp[, alien.ind, drop = FALSE]
     closest.native.ind <- which.min(alien.col) #Find row containing minimum phylogenetic distance along column; shouldn't be any other non-natives, or itself among the rows
     closest.nat <- c(closest.nat, rownames(temp)[closest.native.ind]) #Extract closest native taxon name
     pnnd <- c(pnnd, temp[closest.native.ind, alien.ind]) #Extract phylogenetic distance
