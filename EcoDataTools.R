@@ -805,7 +805,10 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
   return(out)
 }
 
-## Jun's Functions
+#phylodist (Author: J. Lim)
+# Calculates phylogenetic nearest native neighbour distance given a list of alien species and native species
+# Also calculates the mean phylogenetic distance between each alien species and all the native species on the list
+
 phylodist <- function(natives, aliens, phy){
   #Diagnostic checks
   taxon <- c(natives, aliens)
