@@ -521,6 +521,8 @@ plotComm <- function(comm.data, phylo, groups = rep(1, nrow(comm.data)),
   #
   # Return:
   #  a matrix of community data
+  # ultrametricize tree FIRST
+  phylo<- compute.brlen(phylo, method="Grafen")
   # plot phylogeny, allow space for points
   edges <- extractEdges(phylo, phylo$tip.label[1], type = 2)
   phylo$edge.length <- phylo$edge.length/sum(phylo$edge.length[edges])
