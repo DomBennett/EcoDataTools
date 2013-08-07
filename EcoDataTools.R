@@ -814,18 +814,24 @@ phylodist <- function(natives, aliens, phy){
   }
   tip <- phy$tip.label[!phy$tip.label %in% taxon] 
   trimmedphy <- drop.tip(phy, tip = tip) #Removing taxa that are not found; phylogeny ONLY contains natives and aliens
-  trimmedaliens <- aliens[aliens %in% trimmedphy$tip.label] #New aliens list which now no longer contains aliens not represented in the tree
+  alien.incl <- aliens %in% trimmedphy$tip.label
+  natives.incl <- natives %in% trimmedphy$tip.label
+  excludedaliens <- aliens[! alien.incl]
+  excludednatives <- natives[! natives.incl] # Output unmatched species for sanity checking
+  trimmedaliens <- aliens[alien.incl] #New aliens list which now no longer contains aliens not represented in the tree
+  trimmednatives <- natives[natives.incl]
+  trimmedtaxon <- c(trimmednatives, trimmedaliens)
   #Results vectors
   pnnd <- NULL
   mpd <- NULL
   closest.nat <- NULL
   #Distance matrices
   phydist <- cophenetic(trimmedphy) #Generate phylogenetic distance matrix
-  order <- match(taxon, colnames(phydist)) #Find index of rows for taxa
+  order <- match(trimmedtaxon, colnames(phydist)) #Find index of rows for taxa
   phydist <- phydist[order, order] #Ensuring that the rows are sorted in the same order as taxa
-  exclude <- which(colnames(phydist) %in% aliens == TRUE) #Find rows for aliens
+  exclude <- which(colnames(phydist) %in% trimmedaliens == TRUE) #Find rows for aliens
   temp <- phydist[-exclude, ,drop = FALSE] #Remove all non-natives rows from matrix
-  for(i in aliens){
+  for(i in trimmedaliens){
     alien.ind <- colnames(temp) %in% i
     alien.col <- temp[, alien.ind, drop = FALSE]
     closest.native.ind <- which.min(alien.col) #Find row containing minimum phylogenetic distance along column; shouldn't be any other non-natives, or itself among the rows
@@ -833,7 +839,8 @@ phylodist <- function(natives, aliens, phy){
     pnnd <- c(pnnd, temp[closest.native.ind, alien.ind]) #Extract phylogenetic distance
     mpd <- c(mpd, sum(alien.col) / dim(alien.col)[1])
   }
-  data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
+  results <- data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
+  output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives)
 }
 
 #Creates a list of trait matrices
@@ -875,20 +882,6 @@ traitdist <- function(closest.native, aliens, traitdistlist){
   traitresults$taxon <- aliens
   return(traitresults)
 }
-
-#Testing phylo and trait distance functions
-#taxon <- c("spA", "spB", "spC", "spD", "spE", "spF")
-#testphy <- rtree(6)
-#testphy$tip.label <- c("spA", "spC", "spD", "spE", "spF", "spB")
-#trait <- data.frame(height = c(1,2,3,2,1,2), life.form = c("A","B","A","B", "C", "D"))
-#rownames(trait) <- c("spA", "spB", "spC", "spD", "spE", "spF")
-#x <- pnnd(natives = taxon[1:2], aliens = taxon[3:6], phy = testphy)
-#y <- traitdistlist(trait)
-#z <- traitdist(aliens = x$taxon, closest.native = x$closest.nat, y, trait)
-#a <- merge(x, z)
-#a$life.form.diff <- as.factor(a$life.form.diff)
-#mod <- aov(a$pnnd~a$height.diff*a$life.form.diff)
-#summary(mod)
 
 taxa2phylomatic <- function(taxa, output.dir, output.name, binom, storedtree){
   storedtree= "R20120829"
