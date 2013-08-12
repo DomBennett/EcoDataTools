@@ -8,6 +8,7 @@ library(caper)
 library(lme4)
 library(stringr) #String manipulation tools
 library(RCurl) ##GET and POST to URL queries functionality
+library(apTreeshape) # randI
 
 ## Dom's Functions:
 deg2dec <- function(data) {
