@@ -1052,3 +1052,25 @@ if(res == 6){
 	}
 	data.frame(hectad = x, eastings, northings)
 }
+
+## RANDOMIZATION TEST FOR COLLESS Ic METRIC OF PHYLOGENETIC IMBALANCE
+randI <- function(splist, phy, nrand){
+  nsp <- length(splist)
+  tip <- phy$tip.label[! phy$tip.label %in% splist]
+  obsphy <- drop.tip(phy, tip = tip)
+  obsphy <- as.treeshape(obsphy)
+  obsI <- colless(obsphy, norm = "pda")
+  randI <- NULL
+  for(i in 1:nrand){
+    randsp <- sample(phy$tip.label, size=nsp, replace=FALSE)
+    tip <- phy$tip.label[! phy$tip.label %in% randsp]
+    tempphy <- drop.tip(phy, tip)
+    tempphy <- as.treeshape(tempphy)
+    temp <- colless(tempphy, norm = "pda")
+    randI <- c(randI, temp)
+  }
+  rank <- rank(c(obsI, randI), ties.method="max")[1]
+  results <- data.frame(splocal = nsp, spreg = length(phy$tip.label), nrand = nrand, localcolless = obsI, p = rank/nrand)
+  output <- list(results = results, randI = randI)
+  return(output)
+}
