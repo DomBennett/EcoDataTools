@@ -851,18 +851,21 @@ phylodist <- function(natives, aliens, phy){
 
 #Creates a list of trait matrices
 traitdistlist <- function(trait){
-  ntrait <- length(colnames(trait))
+  traitlist <- names(trait)
+  ntrait <- length(traitlist)
   traitdist <- vector("list", ntrait)
   names(traitdist) <- colnames(trait)
   for(j in 1:ntrait){
-    if(is.factor(trait[,j]) == TRUE){
-      levels(trait[,j]) <- 1:length(levels(trait[,j])) #Convert levels of trait into numerical values
-      temp <- decostand(dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE), method = "pa")
+    trait.col <- names(trait) %in% traitlist[j]
+    if(is.factor(trait[, trait.col]) == TRUE){
+      levels(trait[, trait.col]) <- 1:length(levels(trait[, trait.col])) #Convert levels of trait into numerical values
+      temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
       temp <- as.matrix(temp)
+      temp <- ifelse(temp > 0, 1, 0)
       rownames(temp) <- colnames(temp) <- rownames(trait)
       traitdist[[j]] <- temp
     } else {
-      temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
+      temp <- dist(trait[, trait.col], method = "manhattan", upper = TRUE, diag = TRUE)
       temp <- as.matrix(temp)
       rownames(temp) <- colnames(temp) <- rownames(trait)
       traitdist[[j]] <- temp
