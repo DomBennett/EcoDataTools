@@ -8,6 +8,7 @@ library(caper)
 library(lme4)
 library(stringr) #String manipulation tools
 library(RCurl) ##GET and POST to URL queries functionality
+library(apTreeshape) # randI
 
 ## Dom's Functions:
 deg2dec <- function(data) {
@@ -850,18 +851,21 @@ phylodist <- function(natives, aliens, phy){
 
 #Creates a list of trait matrices
 traitdistlist <- function(trait){
-  ntrait <- length(colnames(trait))
+  traitlist <- names(trait)
+  ntrait <- length(traitlist)
   traitdist <- vector("list", ntrait)
   names(traitdist) <- colnames(trait)
   for(j in 1:ntrait){
-    if(is.factor(trait[,j]) == TRUE){
-      levels(trait[,j]) <- 1:length(levels(trait[,j])) #Convert levels of trait into numerical values
-      temp <- decostand(dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE), method = "pa")
+    trait.col <- names(trait) %in% traitlist[j]
+    if(is.factor(trait[, trait.col]) == TRUE){
+      levels(trait[, trait.col]) <- 1:length(levels(trait[, trait.col])) #Convert levels of trait into numerical values
+      temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
       temp <- as.matrix(temp)
+      temp <- ifelse(temp > 0, 1, 0)
       rownames(temp) <- colnames(temp) <- rownames(trait)
       traitdist[[j]] <- temp
     } else {
-      temp <- dist(trait[,j], method = "manhattan", upper = TRUE, diag = TRUE)
+      temp <- dist(trait[, trait.col], method = "manhattan", upper = TRUE, diag = TRUE)
       temp <- as.matrix(temp)
       rownames(temp) <- colnames(temp) <- rownames(trait)
       traitdist[[j]] <- temp
@@ -1051,4 +1055,26 @@ if(res == 6){
 		}
 	}
 	data.frame(hectad = x, eastings, northings)
+}
+
+## RANDOMIZATION TEST FOR COLLESS Ic METRIC OF PHYLOGENETIC IMBALANCE
+randI <- function(splist, phy, nrand){
+  nsp <- length(splist)
+  tip <- phy$tip.label[! phy$tip.label %in% splist]
+  obsphy <- drop.tip(phy, tip = tip)
+  obsphy <- as.treeshape(obsphy)
+  obsI <- colless(obsphy, norm = "pda")
+  randI <- NULL
+  for(i in 1:nrand){
+    randsp <- sample(phy$tip.label, size=nsp, replace=FALSE)
+    tip <- phy$tip.label[! phy$tip.label %in% randsp]
+    tempphy <- drop.tip(phy, tip)
+    tempphy <- as.treeshape(tempphy)
+    temp <- colless(tempphy, norm = "pda")
+    randI <- c(randI, temp)
+  }
+  rank <- rank(c(obsI, randI), ties.method="max")[1]
+  results <- data.frame(splocal = nsp, spreg = length(phy$tip.label), nrand = nrand, localcolless = obsI, p = rank/nrand)
+  output <- list(results = results, randI = randI)
+  return(output)
 }
