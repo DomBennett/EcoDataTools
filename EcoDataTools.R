@@ -812,7 +812,7 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
 # Calculates phylogenetic nearest native neighbour distance given a list of alien species and native species
 # Also calculates the mean phylogenetic distance between each alien species and all the native species on the list
 
-phylodist <- function(natives, aliens, phy){
+phylodist <- function(natives, aliens, phy, returnphy = FALSE){
   #Diagnostic checks
   taxon <- c(natives, aliens)
   if(sum(taxon %in% phy$tip.label) != length(taxon)){
@@ -846,7 +846,11 @@ phylodist <- function(natives, aliens, phy){
     mpd <- c(mpd, sum(alien.col) / dim(alien.col)[1])
   }
   results <- data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
-  output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives, phy = trimmedphy)
+  output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives)
+  if(returnphy == TRUE){
+  	output$phy <- trimmedphy
+  } 
+  return(output)
 }
 
 #Creates a list of trait matrices
