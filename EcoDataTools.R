@@ -846,7 +846,7 @@ phylodist <- function(natives, aliens, phy){
     mpd <- c(mpd, sum(alien.col) / dim(alien.col)[1])
   }
   results <- data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
-  output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives)
+  output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives, phy = trimmedphy)
 }
 
 #Creates a list of trait matrices
