@@ -1077,7 +1077,7 @@ randI <- function(splist, phy, nrand, norm = NULL){
     temp <- colless(tempphy, norm = norm)
     randI <- c(randI, temp)
   }
-  if(norm = "max"){
+  if(norm == "max"){
   	obsI <- obsI * (2 / (nsp - 1)(nsp - 2))
   	randI <- randI * (2 / (nsp - 1)(nsp - 2)) 
   }
