@@ -1077,6 +1077,10 @@ randI <- function(splist, phy, nrand, norm = NULL){
     temp <- colless(tempphy, norm = norm)
     randI <- c(randI, temp)
   }
+  if(norm = "max"){
+  	obsI <- obsI * (2 / (nsp - 1)(nsp - 2))
+  	randI <- randI * (2 / (nsp - 1)(nsp - 2)) 
+  }
   rank <- rank(c(obsI, randI), ties.method="max")[1]
   results <- data.frame(splocal = nsp, spreg = length(phy$tip.label), nrand = nrand, localcolless = obsI, p = rank/nrand)
   output <- list(results = results, randI = randI)
