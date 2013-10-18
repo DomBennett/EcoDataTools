@@ -1062,7 +1062,7 @@ if(res == 6){
 }
 
 ## RANDOMIZATION TEST FOR COLLESS Ic METRIC OF PHYLOGENETIC IMBALANCE
-randI <- function(splist, phy, nrand, norm = NULL){
+randI <- function(splist, phy, nrand, norm = NULL, cor){
   nsp <- length(splist)
   tip <- phy$tip.label[! phy$tip.label %in% splist]
   obsphy <- drop.tip(phy, tip = tip)
@@ -1077,7 +1077,7 @@ randI <- function(splist, phy, nrand, norm = NULL){
     temp <- colless(tempphy, norm = norm)
     randI <- c(randI, temp)
   }
-  if(norm == "max"){
+  if(cor == "max"){
   	obsI <- obsI * (2 / (nsp - 1)(nsp - 2))
   	randI <- randI * (2 / (nsp - 1)(nsp - 2)) 
   }
