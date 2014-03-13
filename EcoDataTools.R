@@ -1,6 +1,6 @@
 ## No copyright, no warranty
 ## Dominic John Bennett & Junying Lim
-## Last update: 21/07/2013
+## Last update: 13/03/2014
 
 ## Libraries
 library(picante) # Phylogenetic analytical tools
@@ -11,6 +11,104 @@ library(RCurl) ##GET and POST to URL queries functionality
 library(apTreeshape) # randI
 
 ## Dom's Functions:
+phyloNavigate <- function(phylo, tip, window.size = 50) {
+  # Plot a subsection of a large phylogeny, allow user to move up and down tree.
+  #
+  # Args:
+  #  phylo: phylogeny (ape class)
+  #  tip: focal tip around which section of tree will be selected
+  #  window.size: the number of species in the tree
+  #
+  # Returns:
+  #  None
+  tip.i <- which (phylo$tip.label == tip)
+  while (TRUE) {
+    n <- round ((window.size - 1) / 2)
+    if ((tip.i + n) > length (phylo$tip.label)) {
+      sample.names <- phylo$tip.label[(length (phylo$tip.label) - round (n * 2)):length (phylo$tip.label)]
+    } else if ((tip.i - n) < 1) {
+      sample.names <- phylo$tip.label[1:round (n * 2)]
+    } else {
+      sample.names <- phylo$tip.label[(tip.i - n):(tip.i + n)]
+    }
+    sample.names <- sample.names[!duplicated (sample.names)]
+    sampled.tree <- drop.tip (phylo, phylo$tip.label[!phylo$tip.label %in% sample.names])
+    tip.cols <- ifelse (sampled.tree$tip.label %in% tip, "black", "grey")
+    plot.phylo (sampled.tree, tip.color = tip.cols, show.tip.label = TRUE, no.margin = TRUE)
+    user.command <- readline ("Type \"u\" or \"d\" to go up and down and hit return. Else hit Esc to exit.")
+    if (user.command == "u") {
+      tip.i <- tip.i + 1
+    } else if (user.command == "d") {
+      tip.id <- tip.i - 1
+    } else {
+      stop ("Undefined user command.")
+    }
+    tip <- phylo$tip.label[tip.i]
+  }
+}
+
+nearestNodeLength <- function(phylo, node, display = FALSE) {
+  # Return the length of the to the next nearest node
+  #
+  # Args:
+  #  phylo: phylogeny (ape class)
+  #  node: the node number in phylo
+  #
+  # Return:
+  #  numeric
+  # find next node one step in
+  inner.node <- phylo$edge[match(node, phylo$edge[,2]),1]
+  # find all nodes and edges descending from inner node
+  d.edges <- which(phylo$edge[,1] %in% inner.node)
+  d.nodes <- phylo$edge[d.edges, 2]
+  # remove starting node
+  nearest.node <- d.nodes[!d.nodes %in% node][1]
+  nearest.node.edge <- d.edges[!d.nodes %in% node][1] #in case of polytomies
+  if (display) {
+    edge.lties <- ifelse(1:nrow(phylo$edge) %in% nearest.node.edge, 1, 3)
+    plot.phylo(phylo, edge.lty = edge.lties, show.tip.label = TRUE)
+    nodelabels("node", node)
+    nodelabels("innernode", inner.node)
+    nodelabels("nextnode", nearest.node)
+  }
+  return(phylo$edge.length[nearest.node.edge])
+}
+
+nodeDescendants <- function(phylo, node, display = FALSE) {
+  # Return the descendant species from a node
+  #
+  # Args:
+  #  phylo: phylogeny (ape class)
+  #  node: the node number in phylo
+  #
+  # Return:
+  #  vector of tip labels
+  if (!is.numeric(node)) {
+    stop("node is not numeric!")
+  }
+  if (node > phylo$Nnode + length(phylo$tip.label)) {
+    stop("node is greater than the number of nodes in phylo!")
+  }
+  if (node <= length(phylo$tip.label)) {
+    term.nodes <- node
+  } else {
+    term.nodes <- vector()
+    temp.nodes <- node
+    while (length(temp.nodes) > 0) {
+      connecting.nodes <- phylo$edge[phylo$edge[,1] %in% temp.nodes, 2]
+      term.nodes <- c(term.nodes, connecting.nodes[connecting.nodes <= length(phylo$tip.label)])
+      temp.nodes <- connecting.nodes[connecting.nodes > length(phylo$tip.label)]
+    }
+  }
+  descendants <- phylo$tip.label[term.nodes]
+  if (display) {
+    tip.cols <- ifelse(phylo$tip.label %in% descendants, "black", "grey")
+    plot.phylo(phylo, tip.color = tip.cols, show.tip.label = TRUE)
+    nodelabels("node", node)
+  }
+  return (descendants)  
+}
+
 deg2dec <- function(data) {
   # Takes 'coordinate strings' in degrees (D M (S)) and converts to decimals.
   # Expects coordinate string such: ##'##'##'
@@ -88,7 +186,7 @@ deg2dec <- function(data) {
   # generate output
   decimals <- data.frame(Latitude = decimal.x, Longitude = decimal.y)
   return(decimals)
-}
+  }
 
 genNullDist <- function(phylo, comm.data, htypes, null = 0, nrands = 2000,
                         metric = "pse") {
@@ -466,7 +564,7 @@ extractEdges <- function(phylo, taxa, type = 1) {
     }
     return (edges)
   }
-}
+  }
 
 commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
                    taxon.names = colnames(comm.data)) {
@@ -812,7 +910,7 @@ phyloRarefy <- function(comm.data, phylo, samp, metric = 'PD', nrands = 2000,
 # Calculates phylogenetic nearest native neighbour distance given a list of alien species and native species
 # Also calculates the mean phylogenetic distance between each alien species and all the native species on the list
 
-phylodist <- function(natives, aliens, phy, returnphy = FALSE){
+phylodist <- function(natives, aliens, phy){
   #Diagnostic checks
   taxon <- c(natives, aliens)
   if(sum(taxon %in% phy$tip.label) != length(taxon)){
@@ -847,10 +945,6 @@ phylodist <- function(natives, aliens, phy, returnphy = FALSE){
   }
   results <- data.frame(pnnd = pnnd, mpd = mpd, taxon = trimmedaliens, closest.nat = closest.nat)
   output <- list(results = results, excluded.aliens = excludedaliens, excluded.natives = excludednatives)
-  if(returnphy == TRUE){
-  	output$phy <- trimmedphy
-  } 
-  return(output)
 }
 
 #Creates a list of trait matrices
@@ -994,92 +1088,88 @@ taxo2newick <-function(x, backbone = TRUE, backbonenewick, hightaxo, lowtaxo){
 #Works with both 2 (100x100 km), 4 (10x10 km), 6 (1x1 km) charactodigit grid reference numbers
 
 osgr_to_en <- function(x, centroid = TRUE){
-
-hectads <- c("HP", "HT", "HU", "HW", "HX", "HY", "HZ", "NA", "NB", "NC", "ND", "NF", "NG", "NH", "NJ", "NK", "NL", "NM", "NN", "NO", "NR", "NS", "NT", "NU", "NW", "NX", "NY", "NZ", "OV", "SC", "SD", "SE", "SH", "SJ", "SK", "SM", "SN", "SO", "SP", "SR", "SS", "ST", "SU", "SV", "SW", "SX", "SY", "SZ", "TA", "TF", "TG", "TL", "TM", "TQ", "TR", "TV")
-X <- c(4, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 2, 3, 4, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5, 5, 6, 5, 6, 5, 6, 5)
-Y <- c(12,11,11,10,10,10,10,9, 9, 9, 9, 8, 8, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 4, 3, 3, 2, 2, 1, 1, 0)
-
-res <- nchar(x[1])
-eastings <- rep(NA, length(x))
-northings <- rep(NA, length(x))
-gridletter <- rep(NA, length(x))
-x2 <- x1 <- rep(NA, length(x))
-y2 <- y1 <- rep(NA, length(x))
-
-if(res == 2){
-	for(i in 1:length(x)){
-		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
-	}
-}
-if(res == 4){
-	for(i in 1:length(x)){
-		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
-		x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
-		y1[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
-	}
-} 
-if(res == 6){
-	for(i in 1:length(x)){
-		gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
-		x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
-		x2[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
-		y1[i] <- as.numeric(substr(x[i], start = 5, stop = 5))
-		y2[i] <- as.numeric(substr(x[i], start = 6, stop = 6))
-	}
-}
-
-	for(i in 1:length(x)){
-		if(res == 2){
-			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000)
-			northings[i] <- (Y[index] * 100000)
-		}
-		if(res == 4){
-			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000)
-			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000)	
-			} else {
-			index <- match(gridletter[i], hectads)
-			eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + (x2[i] * 1000) 
-			northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + (x2[i] * 1000)
-			}
-	}
-	if(centroid == TRUE){
-		if(res == 2){
-			eastings <- eastings + 50000
-			northings <- northings + 50000
-		}
-		if(res == 4){
-			eastings <- eastings + 5000
-			northings <- northings + 5000
-		}
-		if(res == 6){
-			eastings <- eastings + 500
-			northings <- northings + 500
-		}
-	}
-	data.frame(hectad = x, eastings, northings)
+  
+  hectads <- c("HP", "HT", "HU", "HW", "HX", "HY", "HZ", "NA", "NB", "NC", "ND", "NF", "NG", "NH", "NJ", "NK", "NL", "NM", "NN", "NO", "NR", "NS", "NT", "NU", "NW", "NX", "NY", "NZ", "OV", "SC", "SD", "SE", "SH", "SJ", "SK", "SM", "SN", "SO", "SP", "SR", "SS", "ST", "SU", "SV", "SW", "SX", "SY", "SZ", "TA", "TF", "TG", "TL", "TM", "TQ", "TR", "TV")
+  X <- c(4, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 0, 1, 2, 3, 4, 0, 1, 2, 3, 1, 2, 3, 4, 1, 2, 3, 4, 5, 2, 3, 4, 2, 3, 4, 1, 2, 3, 4, 1, 2, 3, 4, 0, 1, 2, 3, 4, 5, 5, 6, 5, 6, 5, 6, 5)
+  Y <- c(12,11,11,10,10,10,10,9, 9, 9, 9, 8, 8, 8, 8, 8, 7, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 5, 4, 4, 4, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1, 0, 0, 0, 0, 0, 4, 3, 3, 2, 2, 1, 1, 0)
+  
+  res <- nchar(x[1])
+  eastings <- rep(NA, length(x))
+  northings <- rep(NA, length(x))
+  gridletter <- rep(NA, length(x))
+  x2 <- x1 <- rep(NA, length(x))
+  y2 <- y1 <- rep(NA, length(x))
+  
+  if(res == 2){
+    for(i in 1:length(x)){
+      gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+    }
+  }
+  if(res == 4){
+    for(i in 1:length(x)){
+      gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+      x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
+      y1[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
+    }
+  } 
+  if(res == 6){
+    for(i in 1:length(x)){
+      gridletter[i] <- substr(x[i], start = 1, stop = 2) #100 x 100 km scale
+      x1[i] <- as.numeric(substr(x[i], start = 3, stop = 3)) #10 x 10 scale
+      x2[i] <- as.numeric(substr(x[i], start = 4, stop = 4))
+      y1[i] <- as.numeric(substr(x[i], start = 5, stop = 5))
+      y2[i] <- as.numeric(substr(x[i], start = 6, stop = 6))
+    }
+  }
+  
+  for(i in 1:length(x)){
+    if(res == 2){
+      index <- match(gridletter[i], hectads)
+      eastings[i] <- (X[index] * 100000)
+      northings[i] <- (Y[index] * 100000)
+    }
+    if(res == 4){
+      index <- match(gridletter[i], hectads)
+      eastings[i] <- (X[index] * 100000) + (x1[i] * 10000)
+      northings[i] <- (Y[index] * 100000) + (y1[i] * 10000)	
+    } else {
+      index <- match(gridletter[i], hectads)
+      eastings[i] <- (X[index] * 100000) + (x1[i] * 10000) + (x2[i] * 1000) 
+      northings[i] <- (Y[index] * 100000) + (y1[i] * 10000) + (x2[i] * 1000)
+    }
+  }
+  if(centroid == TRUE){
+    if(res == 2){
+      eastings <- eastings + 50000
+      northings <- northings + 50000
+    }
+    if(res == 4){
+      eastings <- eastings + 5000
+      northings <- northings + 5000
+    }
+    if(res == 6){
+      eastings <- eastings + 500
+      northings <- northings + 500
+    }
+  }
+  data.frame(hectad = x, eastings, northings)
 }
 
 ## RANDOMIZATION TEST FOR COLLESS Ic METRIC OF PHYLOGENETIC IMBALANCE
-randI <- function(splist, phy, nrand, norm = NULL, cor){
+randI <- function(splist, phy, nrand){
   nsp <- length(splist)
   tip <- phy$tip.label[! phy$tip.label %in% splist]
   obsphy <- drop.tip(phy, tip = tip)
   obsphy <- as.treeshape(obsphy)
-  obsI <- colless(obsphy, norm = norm)
+  obsI <- colless(obsphy, norm = "pda")
   randI <- NULL
   for(i in 1:nrand){
     randsp <- sample(phy$tip.label, size=nsp, replace=FALSE)
     tip <- phy$tip.label[! phy$tip.label %in% randsp]
     tempphy <- drop.tip(phy, tip)
     tempphy <- as.treeshape(tempphy)
-    temp <- colless(tempphy, norm = norm)
+    temp <- colless(tempphy, norm = "pda")
     randI <- c(randI, temp)
-  }
-  if(cor == "max"){
-  	obsI <- obsI * (2 / (nsp - 1)(nsp - 2))
-  	randI <- randI * (2 / (nsp - 1)(nsp - 2)) 
   }
   rank <- rank(c(obsI, randI), ties.method="max")[1]
   results <- data.frame(splocal = nsp, spreg = length(phy$tip.label), nrand = nrand, localcolless = obsI, p = rank/nrand)
