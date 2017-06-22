@@ -598,7 +598,7 @@ commPD <- function(phylo, comm.data, type = 1, min.spp = 2,
   presences <- comm.data[comm.data > 0]
   comm.data[comm.data > 0] <- rep(1, length(presences))
   # drop sites with too few species
-  row.sums <- rowSums(comm.data) > min.spp
+  row.sums <- rowSums(comm.data) >= min.spp
   site.names <- rownames(comm.data)[row.sums]
   comm.data <- comm.data[row.sums, ]
   # calculate PD by site
